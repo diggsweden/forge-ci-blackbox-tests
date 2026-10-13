@@ -1,0 +1,179 @@
+# SPDX-FileCopyrightText: 2026 Digg - Agency for Digital Government
+# SPDX-License-Identifier: CC0-1.0
+#
+# golangci-lint v2 config. See https://golangci-lint.run/usage/configuration/.
+#
+# This is the forge-ci engine's linter set, ported so the black-box
+# suite is held to the same bar. The whole repo is one build-tagged
+# (`blackbox`) test package that drives the compiled binary via
+# os/exec, so a few findings are *by design* here and are excluded
+# below rather than worked around in the tests: launching subprocesses,
+# reading fixture paths derived from t.TempDir(), and multi-value test
+# helpers with named returns.
+#
+# Run it the same way the tests build:
+#   golangci-lint run --build-tags=blackbox ./tests/blackbox/
+version: "2"
+
+run:
+  timeout: 5m
+  build-tags:
+    - blackbox
+
+output:
+  formats:
+    text:
+      path: stdout
+      print-issued-lines: true
+      print-linter-name: true
+      colors: true
+  path-prefix: ""
+
+issues:
+  uniq-by-line: true
+  # Report every occurrence. The defaults (max-issues-per-linter: 50,
+  # max-same-issues: 3) silently truncate, which reads as "clean" when
+  # it isn't; repeated findings in a large suite otherwise hide easily.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+linters:
+  default: none
+  exclusions:
+    rules:
+      # Table-driven tests, fixture strings, and short helper locals are
+      # idiomatic here; these findings are by-design in test code (mirrors
+      # the engine repo's _test.go exclusions).
+      - path: "_test\\.go$"
+        linters:
+          - cyclop # table-driven tests have many subcases
+          - gocognit # same: big table drivers score high by design
+          - dupl # parallel happy/sad-path blocks mirror each other
+          - goconst # repeated fixture strings, often one-off
+          - varnamelen # short locals / loop vars / mock receivers
+          - paralleltest # many tests mutate env / stdin
+          - ireturn # helpers return interfaces
+          - nonamedreturns # multi-value fixture helpers name returns for docs
+          - unparam # helpers mirror each other's signatures (runToolEnv ~ runTool) and
+          # keep args that document intent at the call site (…, "v1.0.0", …)
+      # gosec findings inherent to a black-box exec suite: it launches
+      # the binary and real tools (G204), reads fixture paths built from
+      # t.TempDir() (G304/G703), walks fixture trees (G122), and writes
+      # fixtures with ordinary perms (G301/G302/G306).
+      - path: "_test\\.go$"
+        text: "G204|G301|G302|G306|G304|G703|G122"
+        linters:
+          - gosec
+      # release_gpg_import_test.go ships a throwaway PGP private key so it
+        # can exercise the real local `gpg --import` path. The key is
+      # generated for that test and used nowhere else.
+      - path: "release_gpg_import_test\\.go$"
+        text: "G101"
+        linters:
+          - gosec
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - contextcheck
+    - copyloopvar
+    - cyclop
+    - decorder
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - err113
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exptostd
+    - fatcontext
+    - forcetypeassert
+    - funcorder
+    - ginkgolinter
+    - gocheckcompilerdirectives
+    - gochecknoglobals
+    - gochecknoinits
+    - gochecksumtype
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - goheader
+    - gomoddirectives
+    - goprintffuncname
+    - gosec
+    - govet
+    - grouper
+    - iface
+    - importas
+    - inamedparam
+    - ineffassign
+    - interfacebloat
+    - intrange
+    - loggercheck
+    - maintidx
+    - makezero
+    - mirror
+    - misspell
+    - musttag
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - nlreturn
+    - noctx
+    - nonamedreturns
+    - nosprintfhostport
+    - perfsprint
+    - prealloc
+    - predeclared
+    - promlinter
+    - protogetter
+    - reassign
+    - revive
+    - rowserrcheck
+    - sloglint
+    - sqlclosecheck
+    - staticcheck
+    - tagalign
+    - testableexamples
+    - testifylint
+    - thelper
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - usetesting
+    - varnamelen
+    - wastedassign
+    - zerologlint
+
+  settings:
+    exhaustive:
+      default-signifies-exhaustive: true
+    govet:
+      enable:
+        - shadow
+    varnamelen:
+      min-name-length: 2
+    paralleltest:
+      ignore-missing: false
+      ignore-missing-subtests: true
+    revive:
+      severity: warning
+      confidence: 0.8
+      rules:
+        - name: exported
+          disabled: false
+          exclude: ["Name"]
+        - name: indent-error-flow
+          disabled: false
+        - name: superfluous-else
+          disabled: false

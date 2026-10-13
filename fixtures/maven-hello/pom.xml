@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>se.digg.test</groupId>
+  <artifactId>maven-hello</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <!--
+    project.build.outputTimestamp is the Maven 3.6+ knob for
+    reproducible builds. Setting it (literal ISO-8601 OR
+    ${git.commit.author.time}) makes the JAR Manifest, central
+    directory entries, and every embedded resource share one mtime.
+    Without this, every `mvn package` run produces a JAR with the
+    current wall-clock baked in — defeating bit-identical re-builds.
+  -->
+  <properties>
+    <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+  </properties>
+</project>

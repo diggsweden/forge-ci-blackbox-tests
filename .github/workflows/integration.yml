@@ -1,0 +1,405 @@
+# SPDX-FileCopyrightText: 2026 Digg - Agency for Digital Government
+# SPDX-License-Identifier: CC0-1.0
+#
+# Strict Forge CI compatibility tests
+#
+# Drives the testsuite's `go test -tags=blackbox -count=1 ./tests/blackbox/...`
+# against a chosen `diggsweden/forge-ci` ref. The testsuite's TestMain
+# builds the forge-ci binary from the sibling checkout (or honours the
+# FORGE_CI_TEST_BINARY env var when set), then runs every Test* in the package.
+#
+# Trigger surface:
+#   - workflow_dispatch: manual run with forge-ci repository/ref inputs
+#   - push to any branch: catches testsuite-side regressions against the default target
+#   - pull_request into any branch: same, for PRs
+#   - schedule (daily): re-runs against the default ref to catch drift
+#
+# The default target is the FORGE_CI_REPOSITORY / FORGE_CI_REF repository
+# variables, falling back to diggsweden/forge-ci at main, so a fork can
+# test any repository and branch without relying on a default branch. Each run records the exact
+# resolved commit; forge-ci's own gates separately pin this companion by SHA.
+name: Strict Forge CI Compatibility
+on: # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      forge-ci-repository:
+        description: "Forge CI repository in owner/name form. Empty = FORGE_CI_REPOSITORY or diggsweden/forge-ci. Override with the ref for coordinated fork testing."
+        required: false
+        default: ""
+        type: string
+      forge-ci-ref:
+        description: "diggsweden/forge-ci ref (tag/branch/sha) to test against. Empty = FORGE_CI_REF or main."
+        required: false
+        default: ""
+        type: string
+  push:
+  pull_request:
+  schedule:
+    # 04:00 UTC daily — checks for integration drift between testsuite commits.
+    - cron: "0 4 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  # Cancel in-flight runs on a branch when a newer commit lands. Scheduled
+  # runs use a stable distinct group so a manual workflow_dispatch doesn't
+  # kill the nightly mid-flight (or vice versa).
+  group: integration-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    # Label matches the resolve step's actual behaviour: workflow_dispatch
+    # carries its override into the name; every other trigger falls through
+    # to the default target in the resolve step.
+    name: "tests vs ${{ inputs['forge-ci-repository'] || vars.FORGE_CI_REPOSITORY || 'diggsweden/forge-ci' }}@${{ inputs['forge-ci-ref'] || vars.FORGE_CI_REF || 'main' }}"
+    runs-on: ubuntu-24.04
+    # Hard backstop above the 45m strict-test step, with room for setup,
+    # evidence upload, and action post-steps.
+    timeout-minutes: 90
+    steps:
+      - name: Harden runner
+        timeout-minutes: 2
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout testsuite
+        timeout-minutes: 3
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          path: forge-ci-blackbox-tests
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Resolve which forge-ci ref to test against, in order of
+      # precedence:
+      #   1. workflow_dispatch repository/ref inputs (explicit overrides)
+      #   2. everything else (push / PR / schedule): the primary branch below.
+      - name: Resolve forge-ci ref
+        id: resolve
+        timeout-minutes: 1
+        env:
+          INPUT_REPOSITORY: ${{ inputs['forge-ci-repository'] }}
+          INPUT_REF: ${{ inputs['forge-ci-ref'] }}
+          DEFAULT_REPOSITORY: ${{ vars.FORGE_CI_REPOSITORY || 'diggsweden/forge-ci' }}
+          DEFAULT_REF: ${{ vars.FORGE_CI_REF || 'main' }}
+        run: |
+          set -euo pipefail
+          repository="${INPUT_REPOSITORY:-$DEFAULT_REPOSITORY}"
+          if [ -n "${INPUT_REF}" ]; then
+            ref="${INPUT_REF}"
+          else
+            ref="${DEFAULT_REF}"
+          fi
+          if [[ "$ref" == *$'\r'* || "$ref" == *$'\n'* ]]; then
+            printf 'forge-ci ref must not contain CR or LF\n' >&2
+            exit 2
+          fi
+          if [[ ! "$repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            printf 'forge-ci repository must use owner/name form, got %q\n' "$repository" >&2
+            exit 2
+          fi
+          printf 'Using forge-ci repository: %s\n' "$repository"
+          printf 'Using forge-ci ref: %s\n' "$ref"
+          printf 'repository=%s\n' "$repository" >>"$GITHUB_OUTPUT"
+          printf 'ref=%s\n' "$ref" >>"$GITHUB_OUTPUT"
+
+      - name: Checkout forge-ci
+        timeout-minutes: 3
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: ${{ steps.resolve.outputs.repository }}
+          ref: ${{ steps.resolve.outputs.ref }}
+          path: forge-ci
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record resolved forge-ci commit
+        id: forge-ci-checkout
+        timeout-minutes: 1
+        working-directory: forge-ci
+        run: |
+          set -euo pipefail
+          commit=$(git rev-parse --verify HEAD)
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]]
+          printf 'commit=%s\n' "$commit" >>"$GITHUB_OUTPUT"
+          printf 'Resolved forge-ci checkout: %s\n' "$commit"
+
+      - name: Record evidence source manifests
+        timeout-minutes: 2
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/forge-ci-compatibility-evidence
+          REQUESTED_REPOSITORY: ${{ steps.resolve.outputs.repository }}
+          REQUESTED_REF: ${{ steps.resolve.outputs.ref }}
+          RESOLVED_COMMIT: ${{ steps.forge-ci-checkout.outputs.commit }}
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$EVIDENCE_DIR"
+          write_manifest() {
+            local repo=$1 output=$2
+            (
+              cd "$repo"
+              while IFS= read -r -d '' entry; do
+                object_fields=${entry%%$'\t'*}
+                file=${entry#*$'\t'}
+                object=${object_fields#* }
+                object=${object%% *}
+                digest=$(git cat-file blob "$object" | sha256sum)
+                printf '%s  %q\n' "${digest%% *}" "$file"
+              done < <(git ls-files --stage -z)
+            ) >"$output"
+            size=$(stat -c '%s' "$output")
+            if ((size > 2097152)); then
+              printf '%s is %d bytes and will be replaced by a truncation record during sealing\n' "$output" "$size" >&2
+            fi
+          }
+          write_manifest forge-ci "$EVIDENCE_DIR/forge-ci.sources.sha256"
+          write_manifest forge-ci-blackbox-tests "$EVIDENCE_DIR/companion.sources.sha256"
+          testsuite_commit=$(git -C forge-ci-blackbox-tests rev-parse --verify HEAD)
+          {
+            printf 'requested_forge_ci_repository=%s\n' "$REQUESTED_REPOSITORY"
+            printf 'requested_forge_ci_ref=%s\n' "$REQUESTED_REF"
+            printf 'resolved_forge_ci_commit=%s\n' "$RESOLVED_COMMIT"
+            printf 'resolved_testsuite_commit=%s\n' "$testsuite_commit"
+            printf 'runner_os=%s\n' "$RUNNER_OS"
+            printf 'runner_arch=%s\n' "$RUNNER_ARCH"
+            printf 'runner_image_os=%s\n' "${ImageOS:-unknown}"
+            printf 'runner_image_version=%s\n' "${ImageVersion:-unknown}"
+            printf 'source_manifest_limit_bytes=2097152\n'
+            printf 'test_events_limit_bytes=10485760\n'
+            printf 'artifact_limit_bytes=15728640\n'
+            printf 'retention_days=30\n'
+            printf 'evidence_class=compatibility-only\n'
+            printf 'immutable_release_evidence=false\n'
+            printf 'gradle_distribution=compatibility-version-url-no-verified-checksum\n'
+            printf 'container_from=compatibility-floating-tags-recorded-after-test\n'
+            printf 'go_test_timeout_minutes=35\n'
+            printf 'test_step_timeout_minutes=45\n'
+            printf 'job_timeout_minutes=90\n'
+            printf 'test_events_capture=complete-lines-with-truncation-marker\n'
+            printf 'oversized_evidence=omitted-with-bounded-record\n'
+          } >"$EVIDENCE_DIR/metadata.txt"
+
+      - name: Set up Go
+        timeout-minutes: 4
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: forge-ci-blackbox-tests/go.mod
+          cache: false
+
+      - name: Set up pinned Java
+        timeout-minutes: 4
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
+        with:
+          distribution: temurin
+          java-version: "25.0.2+10"
+
+      - name: Set up pinned Rust
+        timeout-minutes: 8
+        run: |
+          rustup toolchain install 1.94.0 --profile minimal
+          rustup default 1.94.0
+
+      - name: Set up pinned Node.js
+        timeout-minutes: 4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: "24.13.1"
+
+      - name: Install pinned Maven
+        timeout-minutes: 7
+        working-directory: forge-ci-blackbox-tests
+        run: |
+          set -euo pipefail
+          command -v mise >/dev/null
+          mise install maven@3.9.16
+          mise bin-paths maven@3.9.16 >>"$GITHUB_PATH"
+
+      - name: Install floor-checked distro Buildah
+        timeout-minutes: 7
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq buildah
+          buildah --version
+
+      - name: Install cargo-cyclonedx
+        timeout-minutes: 10
+        run: cargo install --locked cargo-cyclonedx --version 0.5.9
+
+      - name: Install cyclonedx-gomod
+        timeout-minutes: 7
+        run: |
+          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v1.10.0
+          printf '%s\n' "$(go env GOPATH)/bin" >>"$GITHUB_PATH"
+
+      - name: Install syft
+        timeout-minutes: 4
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          syft-version: "v1.49.0"
+
+      - name: Install cosign
+        timeout-minutes: 4
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: "v3.1.3"
+
+      # Cache only public inputs whose ecosystems verify content against
+      # go.sum/Cargo.lock. Keep Maven/Gradle/npm, Buildah storage, Sigstore
+      # roots, and all generated key material out of cross-run caches.
+      - name: Restore isolated public dependency caches
+        timeout-minutes: 5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            ${{ runner.temp }}/forge-ci-blackbox-home/go/pkg/mod
+            ${{ runner.temp }}/forge-ci-blackbox-home/.cache/go-build
+            ${{ runner.temp }}/forge-ci-blackbox-home/.cargo/registry
+            ${{ runner.temp }}/forge-ci-blackbox-home/.cargo/git
+          key: blackbox-public-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('forge-ci-blackbox-tests/go.sum', 'forge-ci/go.sum', 'forge-ci-blackbox-tests/fixtures/**/Cargo.lock') }}
+
+      - name: Verify go vet (testsuite)
+        timeout-minutes: 5
+        working-directory: forge-ci-blackbox-tests
+        run: go vet -tags=blackbox ./tests/blackbox/
+
+      # The strict profile's refusals (a selected test, a disabled egress
+      # audit), the drift-target guard and the evidence scripts, before the
+      # suite: each probe stops before forge-ci is built.
+      - name: Validate strict profile contract
+        timeout-minutes: 5
+        working-directory: forge-ci-blackbox-tests
+        run: ./scripts/validate-strict-profile-contract.sh
+
+      - name: Run strict compatibility tests
+        id: strict-tests
+        timeout-minutes: 45
+        working-directory: forge-ci-blackbox-tests
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/forge-ci-compatibility-evidence
+          FORGE_CI_BLACKBOX_PROFILE: strict
+          FORGE_CI_PROC_SWAPS: "/dev/null"
+          TMPDIR: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          export LC_ALL=C
+          go test -json -tags=blackbox -count=1 -timeout 35m ./tests/blackbox/... 2>&1 |
+            sed -u -E \
+              -e 's/(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|glpat-[A-Za-z0-9_-]{20,})/[REDACTED]/g' \
+              -e 's#(Authorization: (Basic|Bearer) )[A-Za-z0-9._~+/=-]+#\1[REDACTED]#g' |
+            "$GITHUB_WORKSPACE/forge-ci-blackbox-tests/scripts/retain-bounded-stream.sh" \
+              "$EVIDENCE_DIR/strict-blackbox.jsonl" 10485760
+
+      - name: Record resolved container image evidence
+        id: container-evidence
+        timeout-minutes: 2
+        if: always()
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/forge-ci-compatibility-evidence
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$EVIDENCE_DIR"
+          output="$EVIDENCE_DIR/resolved-container-images.json"
+          tmp="$output.tmp"
+          error="$EVIDENCE_DIR/resolved-container-images.error.txt"
+          rm -f "$output" "$tmp" "$error"
+          if timeout 30s buildah \
+            --root "${RUNNER_TEMP}/forge-ci-blackbox-buildah/storage" \
+            --runroot "${RUNNER_TEMP}/forge-ci-blackbox-buildah/run" \
+            images --digests --json >"$tmp" 2>"$error"; then
+            mv "$tmp" "$output"
+            rm -f "$error"
+          else
+            status=$?
+            rm -f "$tmp"
+            printf 'buildah image evidence collection failed with status %d\n' "$status" >>"$error"
+          fi
+
+      - name: Bound and seal compatibility evidence
+        id: evidence-seal
+        timeout-minutes: 2
+        if: always()
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/forge-ci-compatibility-evidence
+          TEST_STEP_OUTCOME: ${{ steps.strict-tests.outcome }}
+          CONTAINER_EVIDENCE_OUTCOME: ${{ steps.container-evidence.outcome }}
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$EVIDENCE_DIR"
+          "$GITHUB_WORKSPACE/forge-ci-blackbox-tests/scripts/bound-evidence-bundle.sh" "$EVIDENCE_DIR" 15728640
+          events="$EVIDENCE_DIR/strict-blackbox.jsonl"
+          if [[ -f "$events" ]]; then
+            [[ $(stat -c '%s' "$events") -le 10485760 ]]
+          fi
+          status="$EVIDENCE_DIR/evidence-status.txt"
+          {
+            printf 'test_step_outcome=%s\n' "${TEST_STEP_OUTCOME:-not-run}"
+            printf 'container_evidence_step_outcome=%s\n' "${CONTAINER_EVIDENCE_OUTCOME:-not-run}"
+            for file in metadata.txt forge-ci.sources.sha256 companion.sources.sha256 \
+              strict-blackbox.jsonl resolved-container-images.json \
+              resolved-container-images.error.txt evidence-truncations.txt; do
+              if [[ -f "$EVIDENCE_DIR/$file" ]]; then
+                printf '%s=present:%s-bytes\n' "$file" "$(stat -c '%s' "$EVIDENCE_DIR/$file")"
+              else
+                printf '%s=absent\n' "$file"
+              fi
+            done
+          } >"$status"
+          (
+            cd "$EVIDENCE_DIR"
+            mapfile -d '' files < <(find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z)
+            ((${#files[@]} != 0))
+            sha256sum -- "${files[@]}" >SHA256SUMS
+            chmod 0444 -- "${files[@]}" SHA256SUMS
+          )
+          [[ $(du -sb "$EVIDENCE_DIR" | cut -f1) -le 15728640 ]]
+
+      - name: Retain sealed compatibility evidence
+        id: evidence-upload
+        timeout-minutes: 5
+        if: always() && steps.evidence-seal.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: compatibility-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/forge-ci-compatibility-evidence
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 9
+
+      - name: Job summary
+        timeout-minutes: 1
+        if: always()
+        env:
+          RESOLVED_REPOSITORY: ${{ steps.resolve.outputs.repository }}
+          RESOLVED_REF: ${{ steps.resolve.outputs.ref }}
+          RESOLVED_COMMIT: ${{ steps.forge-ci-checkout.outputs.commit }}
+          EVIDENCE_DIGEST: ${{ steps.evidence-upload.outputs.artifact-digest }}
+          TEST_OUTCOME: ${{ steps.strict-tests.outcome }}
+          TRIGGER: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          markdown_code() {
+            local escaped
+            escaped=$(printf '%s' "$1" | sed \
+              -e 's/&/\&amp;/g' \
+              -e 's/</\&lt;/g' \
+              -e 's/>/\&gt;/g' \
+              -e 's/|/\&#124;/g')
+            printf '<code>%s</code>' "$escaped"
+          }
+          {
+            echo "## Strict Forge CI Compatibility"
+            echo ""
+            echo "| Field | Value |"
+            echo "|---|---|"
+            printf '| forge-ci repository | %s |\n' "$(markdown_code "$RESOLVED_REPOSITORY")"
+            printf '| forge-ci ref | %s |\n' "$(markdown_code "$RESOLVED_REF")"
+            printf '| forge-ci commit | %s |\n' "$(markdown_code "$RESOLVED_COMMIT")"
+            printf '| Trigger | %s |\n' "$(markdown_code "$TRIGGER")"
+            printf '| Testsuite SHA | %s |\n' "$(markdown_code "$GITHUB_SHA")"
+            printf '| Strict test step | %s |\n' "$(markdown_code "$TEST_OUTCOME")"
+            printf '| Evidence artifact SHA-256 | %s |\n' "$(markdown_code "$EVIDENCE_DIGEST")"
+            printf '| Evidence retention | %s |\n' "$(markdown_code "30 days")"
+          } >>"$GITHUB_STEP_SUMMARY"

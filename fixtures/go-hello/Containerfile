@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Digg - Agency for Digital Government
+# SPDX-License-Identifier: CC0-1.0
+#
+# Container-first fixture for go-hello. Mirrors the structure of
+# examples/go-service/Containerfile.example. Three stages: builder,
+# export-binary (scratch), runtime (distroless).
+#
+# No -X main.date=... ldflag — exercising the documented "preferred"
+# pattern (binary reproducibility via the Go-team-blessed
+# -trimpath -buildvcs=false without needing SOURCE_DATE_EPOCH to
+# flow into the build sandbox).
+
+# Compatibility fixture: tags intentionally track ecosystem patch updates.
+# CI records the resolved Buildah image data; these are not immutable release inputs.
+
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.27.2-bookworm AS builder
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+ARG TARGETOS
+ARG TARGETARCH
+ARG VERSION=dev
+
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build \
+      -trimpath \
+      -buildvcs=false \
+      -ldflags="-s -w -X main.version=${VERSION}" \
+      -o /out/go-hello ./
+
+FROM scratch AS export-binary
+COPY --from=builder /out/go-hello /go-hello
+
+FROM gcr.io/distroless/static-debian12:nonroot AS runtime
+COPY --from=builder /out/go-hello /usr/local/bin/go-hello
+ENTRYPOINT ["/usr/local/bin/go-hello"]

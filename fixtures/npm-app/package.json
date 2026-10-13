@@ -1,0 +1,9 @@
+{
+  "name": "@diggsweden/npm-app",
+  "version": "0.1.0",
+  "description": "test fixture: NPM application shape (has a build script)",
+  "license": "CC0-1.0",
+  "scripts": {
+    "build": "node -e \"require('fs').mkdirSync('dist',{recursive:true}); require('fs').writeFileSync('dist/main.js','console.log(\\\"hello\\\");\\n')\""
+  }
+}

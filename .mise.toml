@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Digg - Agency for Digital Government
+# SPDX-License-Identifier: CC0-1.0
+
+[settings]
+experimental = true
+minimum_release_age = "7d"
+
+[tools]
+"aqua:casey/just" = "1.58.0"
+"aqua:golangci/golangci-lint" = "2.14.0"
+# The module's toolchain: golangci-lint type-checks against the Go on PATH, and
+# a newer mise-global Go than the linter supports breaks that check.
+go = "1.27.2"
+maven = "3.9.16"
+node = "26.8.2"
