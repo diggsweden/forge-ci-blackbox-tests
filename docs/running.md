@@ -58,7 +58,8 @@ support) fails instead. `TestMain`:
 - refuses test-selection flags, so a filtered run cannot pass as the gate;
 - requires the local recording egress proxy to start.
   `BLACKBOX_EGRESS_PROXY=off` is permitted only for optional local
-  diagnostics.
+  diagnostics;
+- refuses a non-Linux host, after the checks above.
 
 Explicit Linux exclusions remain exclusions; strict mode does not turn them
 into claimed coverage.

@@ -14,6 +14,7 @@ package blackbox
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -40,6 +41,12 @@ func procSwapsWith(t *testing.T, swapOn bool) string {
 // swap on or off — the one variable these tests actually vary.
 func swapEnv(t *testing.T, key gpgKey, swapOn bool) map[string]string {
 	t.Helper()
+
+	// The engine reads swap state, and this override, only in its Linux build;
+	// elsewhere it reports undetermined state, covered by the soft-pass test.
+	if runtime.GOOS != "linux" {
+		skipInOptionalProfilef(t, "swap policy reads Linux /proc/swaps; run on a native Linux host")
+	}
 
 	env := key.signingEnv(t)
 	env["FORGE_CI_PROC_SWAPS"] = procSwapsWith(t, swapOn)

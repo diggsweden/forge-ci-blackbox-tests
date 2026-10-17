@@ -44,6 +44,7 @@ package blackbox
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -264,6 +265,7 @@ func TestContainerImage_ReproducibleImageID(t *testing.T) {
 
 	build := func(tag string) string {
 		_, _, code := runBuildah(t, proj, "build",
+			"--platform", "linux/"+runtime.GOARCH,
 			"--timestamp", "1700000000",
 			"-t", tag,
 			"-f", "Containerfile", ".")
@@ -318,6 +320,7 @@ func TestContainerImage_ReproducibleImageID(t *testing.T) {
 
 	shifted := func() string {
 		_, _, code := runBuildah(t, proj, "build",
+			"--platform", "linux/"+runtime.GOARCH,
 			"--timestamp", "1800000000",
 			"-t", "repro-test-shifted:1",
 			"-f", "Containerfile", ".")

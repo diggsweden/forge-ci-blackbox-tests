@@ -305,7 +305,33 @@ func preflightProfileArgs(args []string) error {
 		return fmt.Errorf("%w: %w", errStrictProfile, err)
 	}
 
+	return requireStrictHost(runtime.GOOS)
+}
+
+// requireStrictHost refuses the strict gate off Linux before forge-ci is built:
+// its Buildah, /proc and native-container rows cannot produce evidence there.
+func requireStrictHost(goos string) error {
+	if goos != "linux" {
+		return fmt.Errorf("%w: strict profile is the Linux compatibility gate and cannot run on %s; "+
+			"run it on a native Linux host of the target architecture, or use `just test` for the local profile",
+			errStrictProfile, goos)
+	}
+
 	return nil
+}
+
+func TestRequireStrictHost_RefusesNonLinux(t *testing.T) {
+	t.Parallel()
+
+	if err := requireStrictHost("linux"); err != nil {
+		t.Fatalf("linux strict host refused: %v", err)
+	}
+	for _, goos := range []string{"darwin", "freebsd", "windows"} {
+		err := requireStrictHost(goos)
+		if !errors.Is(err, errStrictProfile) || !strings.Contains(err.Error(), "native Linux host") {
+			t.Errorf("strict host %s = %v, want the actionable Linux-host refusal", goos, err)
+		}
+	}
 }
 
 // TestStrictProfile_RejectsAnUnrecognisedProfileValue pins the switch that

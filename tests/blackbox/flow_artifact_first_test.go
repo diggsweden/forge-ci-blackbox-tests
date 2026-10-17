@@ -19,6 +19,7 @@ package blackbox
 
 import (
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -408,12 +409,11 @@ func TestFlow_ArtifactFirst_GoBinary(t *testing.T) {
 }
 
 // TestFlow_ArtifactFirst_CargoBinary mirrors the Go-binary cascade for
-// Cargo: cross-compile, SBOM, checksum, sign, verify. The dist/ layout
+// Cargo: native build, SBOM, checksum, sign, verify. The dist/ layout
 // matches Go intentionally so downstream packaging works uniformly.
 //
-// Linux/amd64 only — multi-platform cross-compile needs `rustup target
-// add` and a matching cross-linker baked into the runtime image, which
-// is exercised in CI not in the local testsuite.
+// Use a supported native platform. Cross-target builds need target libraries
+// and linkers supplied by their dedicated runtime-image jobs.
 func TestFlow_ArtifactFirst_CargoBinary(t *testing.T) {
 	requireTool(t, "cargo")
 	requireTool(t, "syft")
@@ -423,16 +423,20 @@ func TestFlow_ArtifactFirst_CargoBinary(t *testing.T) {
 	key := bootstrapGPGKey(t)
 
 	proj := copyTree(t, fixture("cargo-hello"))
+	platform := runtime.GOOS + "/" + runtime.GOARCH
+	platformDir := runtime.GOOS + "-" + runtime.GOARCH
+	binaryName := "cargo-hello-" + platformDir
+	binaryRelative := filepath.Join("dist", platformDir, binaryName)
 
 	// 1. build cargo compile → dist/<goos>-<goarch>/<binary>-<goos>-<goarch>
 	if _, stderr, code := run(t, runOpts{dir: proj},
 		"build", "cargo", "run",
 		"--version", "v0.3.1",
-		"--platforms", "linux/amd64"); code != 0 {
+		"--platforms", platform); code != 0 {
 		t.Fatalf("step 1 cargo compile exit %d\nstderr: %s", code, stderr)
 	}
 
-	binary := filepath.Join(proj, "dist", "linux-amd64", "cargo-hello-linux-amd64")
+	binary := filepath.Join(proj, binaryRelative)
 	if !fileExists(binary) {
 		t.Fatalf("step 1 missing compiled binary at %s", binary)
 	}
@@ -449,21 +453,21 @@ func TestFlow_ArtifactFirst_CargoBinary(t *testing.T) {
 	// 3. checksums covering the binary + 4. sign.
 	if _, _, code := run(t, runOpts{dir: proj},
 		"release", "checksums",
-		"--attach-artifacts", "dist/linux-amd64/cargo-hello-linux-amd64",
+		"--attach-artifacts", binaryRelative,
 		"--sbom-dir", "."); code != 0 {
 		t.Fatalf("step 3 checksums exit %d", code)
 	}
 
 	// Same rationale as the Go cascade: pin the SBOM pair, not just the binary.
-	assertChecksumManifestLists(t, filepath.Join(proj, "checksums.sha256"), "cargo-hello-linux-amd64",
-		"cargo-hello-linux-amd64-analyzed-binary-sbom.spdx.json", "cargo-hello-linux-amd64-analyzed-binary-sbom.cyclonedx.json")
+	assertChecksumManifestLists(t, filepath.Join(proj, "checksums.sha256"), binaryName,
+		binaryName+"-analyzed-binary-sbom.spdx.json", binaryName+"-analyzed-binary-sbom.cyclonedx.json")
 
 	if _, stderr, code := run(t, runOpts{
 		dir: proj,
 		env: key.signingEnv(t),
 	},
 		"release", "sign",
-		"--attach-artifacts", "dist/linux-amd64/cargo-hello-linux-amd64"); code != 0 {
+		"--attach-artifacts", binaryRelative); code != 0 {
 		t.Fatalf("step 4 sign exit %d\nstderr: %s", code, stderr)
 	}
 
@@ -477,7 +481,7 @@ func TestFlow_ArtifactFirst_CargoBinary(t *testing.T) {
 	// 6. gpg --verify on the binary's signature + the manifest signature.
 	for _, pair := range []struct{ asc, subj string }{
 		{asc: "checksums.sha256.asc", subj: "checksums.sha256"},
-		{asc: "cargo-hello-linux-amd64.asc", subj: "dist/linux-amd64/cargo-hello-linux-amd64"},
+		{asc: binaryName + ".asc", subj: binaryRelative},
 	} {
 		ascPath := filepath.Join(proj, pair.asc)
 		if !fileExists(ascPath) {

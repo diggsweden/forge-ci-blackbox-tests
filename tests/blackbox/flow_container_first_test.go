@@ -31,10 +31,35 @@
 package blackbox
 
 import (
+	"debug/elf"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
+
+func assertNativeLinuxArtifact(t *testing.T, path string) {
+	t.Helper()
+
+	binary, err := elf.Open(path)
+	if err != nil {
+		t.Fatalf("read extracted ELF: %v", err)
+	}
+	defer func() { _ = binary.Close() }()
+
+	var machine elf.Machine
+	switch runtime.GOARCH {
+	case "amd64":
+		machine = elf.EM_X86_64
+	case "arm64":
+		machine = elf.EM_AARCH64
+	default:
+		t.Fatalf("no native ELF expectation for %s", runtime.GOARCH)
+	}
+	if binary.Class != elf.ELFCLASS64 || binary.Machine != machine {
+		t.Fatalf("artifact is %s/%s, want native linux/%s", binary.Class, binary.Machine, runtime.GOARCH)
+	}
+}
 
 // TestFlow_ContainerFirst_Cargo runs the full container-first
 // cascade for Cargo, including a real buildah build with
@@ -57,6 +82,8 @@ func TestFlow_ContainerFirst_Cargo(t *testing.T) {
 	key := bootstrapGPGKey(t)
 
 	proj := copyTree(t, fixture("cargo-hello"))
+	binaryName := "cargo-hello-linux-" + runtime.GOARCH
+	binaryRelative := filepath.Join("dist", binaryName)
 
 	// 1. Build-layer SBOM: cargo-cyclonedx writes bom.json; forge-ci
 	//    promotes it. This step normally runs in sbom-cargo.yml in
@@ -93,23 +120,25 @@ func TestFlow_ContainerFirst_Cargo(t *testing.T) {
 	}
 
 	if _, stderr, code := runBuildah(t, proj, "build",
+		"--platform", "linux/"+runtime.GOARCH,
 		"--timestamp", "1700000000",
 		"--target", "export-binary",
 		"--output", "type=local,dest="+extract,
 		"-f", "Containerfile", "."); code != 0 {
-		skipInOptionalProfilef(t,
-			"step 2 buildah failed for pinned builder rust:1.94.0-slim-bookworm (exit %d); "+
-				"container-first cascade not exercised on this host:\n%s", code, stderr)
+		t.Fatalf("step 2 buildah failed for pinned builder rust:1.94.0-slim-bookworm (exit %d):\n%s", code, stderr)
 	}
 
 	// Rename binary to the multi-arch convention extract.binary
 	// emits: <name>-linux-<arch>.
 	if err := os.Rename(
 		filepath.Join(extract, "cargo-hello"),
-		filepath.Join(extract, "cargo-hello-linux-amd64"),
+		filepath.Join(extract, binaryName),
 	); err != nil {
 		t.Fatalf("step 2 rename: %v", err)
 	}
+	// Inspect the exported target independently of the controller's libc;
+	// the builder image supplies the Linux GNU runtime ABI.
+	assertNativeLinuxArtifact(t, filepath.Join(extract, binaryName))
 
 	// 3. Analyzed-artifact SBOM over the extracted binary.
 	if _, _, code := run(t, runOpts{dir: proj},
@@ -130,20 +159,20 @@ func TestFlow_ContainerFirst_Cargo(t *testing.T) {
 	//    cwd and needs that path to resolve.
 	if _, _, code := run(t, runOpts{dir: proj},
 		"release", "checksums",
-		"--attach-artifacts", "dist/cargo-hello-linux-amd64",
+		"--attach-artifacts", binaryRelative,
 		"--sbom-dir", "."); code != 0 {
 		t.Fatalf("step 4 checksums exit %d", code)
 	}
 
 	assertChecksumManifestLists(t, filepath.Join(proj, "checksums.sha256"),
-		"cargo-hello-linux-amd64", filepath.Base(buildSBOM), filepath.Base(analyzedSPDX))
+		binaryName, filepath.Base(buildSBOM), filepath.Base(analyzedSPDX))
 
 	// 5. Sign the binary + manifest.
 	if _, stderr, code := run(t, runOpts{
 		dir: proj,
 		env: key.signingEnv(t),
 	}, "release", "sign",
-		"--attach-artifacts", "dist/cargo-hello-linux-amd64"); code != 0 {
+		"--attach-artifacts", binaryRelative); code != 0 {
 		t.Fatalf("step 5 sign exit %d\nstderr: %s", code, stderr)
 	}
 
@@ -160,7 +189,7 @@ func TestFlow_ContainerFirst_Cargo(t *testing.T) {
 	// binary signature passed while the manifest half still looked right.
 	for _, pair := range []struct{ asc, subj string }{
 		{asc: "checksums.sha256.asc", subj: "checksums.sha256"},
-		{asc: "cargo-hello-linux-amd64.asc", subj: "dist/cargo-hello-linux-amd64"},
+		{asc: binaryName + ".asc", subj: binaryRelative},
 	} {
 		ascPath := filepath.Join(proj, pair.asc)
 

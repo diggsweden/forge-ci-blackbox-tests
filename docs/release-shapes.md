@@ -7,6 +7,13 @@ The cascade tests split on how the release artifact comes to exist. That is
 the axis behind `flow_artifact_first`, `flow_container_first`, and
 `container_validate_artifacts`.
 
+The Cargo artifact-first cascade uses a supported native Linux/macOS target;
+cross-target Rust linking belongs to jobs that supply those target SDKs and
+linkers. Container-first binary names use the native CPU architecture, and the
+tests check the exported ELF header against that architecture and filename.
+Buildah runs use an explicit native Linux platform. These checks do not require
+a glibc-built artifact to execute directly on a musl controller.
+
 | Shape | What ships | Ecosystems | Covered by |
 |---|---|---|---|
 | **artifact-first** | the built file itself (jar, tarball, cross-compiled binary), signed + attached to the release | maven-app, maven-lib, gradle, npm, go, cargo | `flow_artifact_first_test.go` |
