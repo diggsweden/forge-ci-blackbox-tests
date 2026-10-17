@@ -114,7 +114,8 @@ func runSuite(m *testing.M) (code int) {
 	// behaviour back and ends the run at once.
 	context.AfterFunc(suiteCtx, stopSignals)
 
-	release, lockErr := acquireSuiteCacheLock(os.TempDir())
+	root := suiteCacheRoot()
+	release, lockErr := acquireSuiteCacheLock(root)
 	if lockErr != nil {
 		fmt.Fprintf(os.Stderr, "blackbox cache: %v\n", lockErr)
 
@@ -124,7 +125,7 @@ func runSuite(m *testing.M) (code int) {
 		// An interrupted run keeps its lock, as a killed one does: its
 		// children were stopped mid-write, so the caches need a look first.
 		if suiteCtx.Err() != nil {
-			lock := filepath.Join(os.TempDir(), "forge-ci-blackbox.lock")
+			lock := filepath.Join(root, "forge-ci-blackbox.lock")
 			fmt.Fprintf(os.Stderr, "blackbox: interrupted; the cache lock %s stays. To start clean: rmdir %s && just clean\n", lock, lock)
 			if code == 0 {
 				code = 1
@@ -142,7 +143,14 @@ func runSuite(m *testing.M) (code int) {
 	}()
 	// Fixtures are removed before the lock is released, including on the
 	// explicit FORGE_CI_TEST_BINARY path. Persistent caches remain available to later runs.
-	defer removeSuiteFixtures()
+	defer func() {
+		if err := removeSuiteFixtures(); err != nil {
+			fmt.Fprintf(os.Stderr, "blackbox fixtures: %v\n", err)
+			if code == 0 {
+				code = 1
+			}
+		}
+	}()
 
 	// Resolve sibling forge-ci checkout. The testsuite lives at
 	// .../forge-ci-blackbox-tests/, so the binary source is at ../forge-ci/.
@@ -205,11 +213,11 @@ func runSuite(m *testing.M) (code int) {
 
 // The portable directory lock is also acquired by scripts/clean-cache.sh.
 // Never reclaim an existing lock: an interrupted owner needs manual inspection.
-func acquireSuiteCacheLock(temporary string) (func() error, error) {
-	if !filepath.IsAbs(temporary) {
-		return nil, fmt.Errorf("TMPDIR must be absolute: %q: %w", temporary, os.ErrInvalid)
+func acquireSuiteCacheLock(root string) (func() error, error) {
+	if !filepath.IsAbs(root) {
+		return nil, fmt.Errorf("cache root must be absolute: %q: %w", root, os.ErrInvalid)
 	}
-	lock := filepath.Join(temporary, "forge-ci-blackbox.lock")
+	lock := filepath.Join(root, "forge-ci-blackbox.lock")
 	if err := os.Mkdir(lock, 0o700); err != nil {
 		return nil, fmt.Errorf("suite or cleanup is active, or a prior run was interrupted; inspect %q: %w", lock, err)
 	}
@@ -239,11 +247,18 @@ func TestSuiteCacheLockSerializesOwners(t *testing.T) {
 	}
 }
 
+// The cleanup script must derive the same cache root as the suite, so the
+// root comes from cacheRoot under the environment handed to the script.
 func TestSuiteCacheLockBlocksCleanup(t *testing.T) {
-	t.Parallel()
-	root := t.TempDir()
+	base := t.TempDir()
+	t.Setenv("HOME", base)
+	t.Setenv("TMPDIR", base)
+	root, rootErr := cacheRoot()
+	if rootErr != nil {
+		t.Fatal(rootErr)
+	}
 	cache := filepath.Join(root, "forge-ci-blackbox-home")
-	if err := os.Mkdir(cache, 0o700); err != nil {
+	if err := os.MkdirAll(cache, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	canary := filepath.Join(cache, "keep")
@@ -258,7 +273,7 @@ func TestSuiteCacheLockBlocksCleanup(t *testing.T) {
 		ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 		defer cancel()
 		cmd := exec.CommandContext(ctx, "bash", filepath.Join(suiteDir, "scripts", "clean-cache.sh"))
-		cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + root, "TMPDIR=" + root}
+		cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + base, "TMPDIR=" + base}
 		cmd.WaitDelay = time.Second
 
 		return cmd.Run()

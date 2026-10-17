@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"
@@ -972,7 +973,7 @@ func fileExists(path string) bool {
 // a file per run into the OS temp dir, accumulating silently for as long as the
 // suite has existed.
 //
-// suiteFixture records such a path for removeSuiteFixtures, which runSuite
+// suiteFixture records such a file for removeSuiteFixtures, which runSuite
 // defers. Register anything the suite creates and does not want to keep. Do NOT
 // register the deliberately persistent state — isolatedHome and buildahRoot are
 // warm caches that exist precisely to survive between runs.
@@ -992,18 +993,22 @@ func suiteFixture(path string) string {
 	return path
 }
 
-// removeSuiteFixtures deletes every registered fixture. Errors are ignored: a
-// fixture that is already gone is the desired state, and a passing test run
-// must not fail over its own cleanup.
-func removeSuiteFixtures() {
+// removeSuiteFixtures removes registered files without recursive deletion.
+// An already absent file is success; other failures must remain visible.
+func removeSuiteFixtures() error {
 	suiteFixtureMu.Lock()
 	defer suiteFixtureMu.Unlock()
 
+	var failures []error
 	for _, path := range suiteFixturePaths {
-		_ = os.RemoveAll(path)
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			failures = append(failures, fmt.Errorf("remove suite fixture: %w", err))
+		}
 	}
 
 	suiteFixturePaths = nil
+
+	return errors.Join(failures...)
 }
 
 //nolint:gochecknoglobals // process-wide cached file path.
@@ -1133,6 +1138,10 @@ var miseBinPaths = sync.OnceValue(func() []string {
 func toolCommand(t *testing.T, dir string, env map[string]string, name string, args ...string) *exec.Cmd {
 	t.Helper()
 
+	if suiteCtx.Err() != nil {
+		t.Fatalf("tool %s: the suite was interrupted", name)
+	}
+
 	bin := name
 	if !strings.ContainsRune(name, os.PathSeparator) {
 		bin = lookupTool(name)
@@ -1142,7 +1151,11 @@ func toolCommand(t *testing.T, dir string, env map[string]string, name string, a
 	}
 
 	ctx, cancel := context.WithTimeout(t.Context(), subprocessTimeout)
-	t.Cleanup(cancel)
+	stop := context.AfterFunc(suiteCtx, cancel)
+	t.Cleanup(func() {
+		stop()
+		cancel()
+	})
 
 	cmd := exec.CommandContext(ctx, bin, args...)
 	cmd.Dir = dir
@@ -1200,16 +1213,58 @@ func runToolEnv(t *testing.T, dir string, env map[string]string, name string, ar
 	return outBuf.String(), errBuf.String(), code
 }
 
+// suiteCacheName names the per-user directory that holds the persistent
+// caches and their lock on macOS. scripts/clean-cache.sh derives the same path.
+const suiteCacheName = "forge-ci-blackbox-tests"
+
+// cacheRoot returns the directory that holds the persistent caches and their
+// lock: TMPDIR on Linux, ~/Library/Caches/forge-ci-blackbox-tests on macOS.
+// macOS's dirhelper deletes files older than three days under TMPDIR but
+// keeps the directories, so unpacked archives (cargo sources, Gradle caches)
+// vanish while the completion markers the toolchains trust survive.
+func cacheRoot() (string, error) {
+	root := os.TempDir()
+	if runtime.GOOS == "darwin" {
+		dir, err := os.UserCacheDir()
+		if err != nil {
+			return "", fmt.Errorf("locate the user cache directory: %w", err)
+		}
+
+		root = filepath.Join(dir, suiteCacheName)
+	}
+
+	return root, nil
+}
+
+// suiteCacheRoot is cacheRoot resolved once. The macOS root belongs to the
+// suite alone, so it gets the same ownership checks as the caches; the shared
+// Linux temp root is used as it is. acquireSuiteCacheLock refuses a relative
+// root before any cache is created.
+//
+//nolint:gochecknoglobals // process-wide cache root, resolved once.
+var suiteCacheRoot = sync.OnceValue(func() string {
+	root, err := cacheRoot()
+	if err != nil {
+		panic("blackbox: " + err.Error())
+	}
+
+	if runtime.GOOS == "darwin" && filepath.IsAbs(root) {
+		mkdirPrivate(root, "cache root")
+	}
+
+	return root
+})
+
 // Toolchain cache isolation. Real toolchain runs (mvn, gradle, cargo,
 // npm, go) cache into $HOME by default. isolatedHome gives them a
-// dedicated home under the OS temp dir so those caches never land in the
-// developer's real home. The dir is process-wide and persistent, so the
+// dedicated home under the suite cache root so those caches never land in
+// the developer's real home. The dir is process-wide and persistent, so the
 // base image, gradle distribution, downloaded deps, and module cache are
 // fetched once and reused across a run. Use the coordinated `just clean` route.
 //
 //nolint:gochecknoglobals // process-wide home path, resolved once.
 var isolatedHome = sync.OnceValue(func() string {
-	dir := filepath.Join(os.TempDir(), "forge-ci-blackbox-home")
+	dir := filepath.Join(suiteCacheRoot(), "forge-ci-blackbox-home")
 	mkdirPrivate(dir, "isolated HOME")
 
 	return dir
@@ -1264,7 +1319,7 @@ func mkdirPrivate(path, label string) {
 }
 
 // Buildah storage isolation. The buildah-driven tests build into a
-// dedicated graphroot under the OS temp dir instead of the developer's
+// dedicated graphroot under the suite cache root instead of the developer's
 // default rootless container storage, so test images and layers never
 // appear in `buildah images` on the host. The root is process-wide, so
 // the base image is pulled once and reused across the buildah tests in a
@@ -1272,7 +1327,7 @@ func mkdirPrivate(path, label string) {
 //
 //nolint:gochecknoglobals // process-wide storage path, resolved once.
 var buildahRoot = sync.OnceValue(func() string {
-	root := filepath.Join(os.TempDir(), "forge-ci-blackbox-buildah")
+	root := filepath.Join(suiteCacheRoot(), "forge-ci-blackbox-buildah")
 	mkdirPrivate(root, "buildah storage root")
 
 	return root

@@ -49,17 +49,22 @@ the real deploy verbs are never called. Forge APIs are faked, and
 
 Toolchain and container caches are redirected out of your real home so a run
 leaves it untouched, while the caches still persist between runs so a warm
-rerun stays fast:
+rerun stays fast. They live under one cache root: `$TMPDIR` (`/tmp` when
+unset) on Linux, and `~/Library/Caches/forge-ci-blackbox-tests` on macOS
+(`os.UserCacheDir`). macOS deletes files older than three days under `$TMPDIR`
+but keeps the directories, so unpacked archives such as cargo sources vanish
+while the markers cargo and Gradle trust remain; the user cache directory is
+not purged that way. Data for a single run stays in `$TMPDIR` on both.
 
 - Real toolchain runs (mvn, gradle, cargo, npm, go) get a dedicated `$HOME` at
-  `$TMPDIR/forge-ci-blackbox-home`. Their caches land there (`~/.m2`,
+  `<cache root>/forge-ci-blackbox-home`. Their caches land there (`~/.m2`,
   `~/.gradle`, `~/.cargo`, `~/.npm`, the go build and module cache), not in
   your own home. The JVM ignores `$HOME` for `user.home`, so Maven receives an
   explicit private `settings.xml` and local repository through `MAVEN_ARGS`,
   while Gradle receives `GRADLE_USER_HOME`. Maven never reads your real
   `~/.m2/settings.xml`, credentials, mirrors, or forge endpoints.
 - The buildah tests build into a dedicated store at
-  `$TMPDIR/forge-ci-blackbox-buildah`, not your default container storage, so
+  `<cache root>/forge-ci-blackbox-buildah`, not your default container storage, so
   test images never appear in `buildah images`.
 
 Both locations may fetch public package/tool inputs over the network on a cold
@@ -69,13 +74,15 @@ They are pure caches and never carry real credentials or user settings. Use
 
 ## The cache lock
 
-The suite and cleanup both acquire `$TMPDIR/forge-ci-blackbox.lock` (`/tmp`
-when `TMPDIR` is unset); another owner is refused before the shared caches are
-used or removed. Cleanup also refuses linked directories or caches owned by
-another user. `TMPDIR` must be absolute.
+The suite and cleanup both acquire `<cache root>/forge-ci-blackbox.lock`;
+another owner is refused before the shared caches are used or removed. Cleanup
+uses one fixed list of the two cache paths and checks both before changing
+either. Linked, unowned, group- or world-writable cache directories are
+refused, and on macOS so is such a cache root. `TMPDIR` (Linux) or `HOME`
+(macOS) must be absolute and its path bytes are preserved.
 
 Tests within one suite retain their existing parallel/serial policy; separate
-suites sharing a temp root run sequentially.
+suites sharing a cache root run sequentially.
 
 The lock regression runs in the Go suite. Its shell-only cleanup counterpart is
 `bash scripts/test-clean-cache.sh`; it uses disposable directories and starts
@@ -93,3 +100,14 @@ An interrupted run keeps the lock, because its children stopped mid-write, and
 prints the command to start clean: confirm that no suite or cleanup is still
 using these caches, then `rmdir` the lock and run `just clean`. A killed
 process leaves the lock too. It is never reclaimed automatically.
+
+Cleanup asks Buildah to remove containers and images using the suite's exact
+storage/run roots and a closed environment. Buildah handles its UID-mapped
+layers; missing or failed runtime cleanup stops the final filesystem removal.
+The storage/run roots have the same ownership and symlink checks as the cache
+roots. Remaining read-only cache directories become owner-writable before
+removal, as needed for Go's module cache; nested symlinks are not followed.
+Both product invocations and direct tool commands stop on suite
+cancellation; subsequent tool commands are refused.
+Suite-owned temporary files use non-recursive removal, and a cleanup error
+turns an otherwise successful run into a failure.

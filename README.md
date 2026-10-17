@@ -41,7 +41,8 @@ just test-binary /path/to/forge-ci
 ```
 
 A run may download dependencies and base images, and may start containers.
-Caches go under `$TMPDIR` and persist between runs; `just clean` removes them.
+Caches go under `$TMPDIR` (`~/Library/Caches/forge-ci-blackbox-tests` on
+macOS) and persist between runs; `just clean` removes them.
 
 Linux and BSD are the primary supported targets; macOS and WSL are best
 effort.
