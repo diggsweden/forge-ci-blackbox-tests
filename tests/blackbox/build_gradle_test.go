@@ -6,8 +6,12 @@
 package blackbox
 
 import (
+	"context"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -66,9 +70,8 @@ func TestGradleSBOM_VersionLines(t *testing.T) {
 	}
 }
 
-// detectJavaHome resolves the active java's JAVA_HOME by resolving its
-// absolute symlink target and walking up two directories. This works for both
-// the system /usr/bin/java symlink and mise/asdf shims.
+// detectJavaHome asks the selected runtime rather than guessing from the
+// executable's parent. Launchers such as macOS /usr/bin/java are not JDK paths.
 func detectJavaHome(t *testing.T) string {
 	t.Helper()
 
@@ -77,16 +80,95 @@ func detectJavaHome(t *testing.T) string {
 		skipInOptionalProfilef(t, "java missing")
 	}
 
-	path, err := filepath.Abs(path)
+	home, err := inspectJavaHome(t.Context(), path, isolatedEnv(nil))
 	if err != nil {
-		skipInOptionalProfilef(t, "resolve absolute java path: %v", err)
+		t.Fatalf("Java runtime is not a usable JDK; run mise exec -- just install-dev-tools: %v", err)
 	}
 
-	path, err = filepath.EvalSymlinks(path)
+	return home
+}
+
+func inspectJavaHome(ctx context.Context, java string, env []string) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, toolInspectionTimeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, java, "-XshowSettings:properties", "-version")
+	cmd.Env = env
+	killGroupOnCancel(cmd)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		skipInOptionalProfilef(t, "resolve java symlinks: %v", err)
+		return "", fmt.Errorf("query java.home: %w: %s", err, output)
 	}
 
-	// .../bin/java → .../
-	return filepath.Dir(filepath.Dir(path))
+	for line := range strings.SplitSeq(string(output), "\n") {
+		home, found := strings.CutPrefix(strings.TrimSpace(line), "java.home = ")
+		if !found {
+			continue
+		}
+		if !filepath.IsAbs(home) {
+			return "", fmt.Errorf("java.home is not absolute: %q: %w", home, os.ErrInvalid)
+		}
+		for _, name := range []string{"java", "javac"} {
+			info, statErr := os.Stat(filepath.Join(home, "bin", name))
+			if statErr != nil {
+				return "", fmt.Errorf("JDK %s: %w", name, statErr)
+			}
+			if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+				return "", fmt.Errorf("JDK %s is not executable: %w", name, os.ErrInvalid)
+			}
+		}
+
+		return home, nil
+	}
+
+	return "", fmt.Errorf("runtime did not report java.home: %w", os.ErrInvalid)
+}
+
+func TestJavaHome_RuntimeMetadataAndHealth(t *testing.T) {
+	t.Parallel()
+
+	for _, scenario := range []string{"launcher", "relative home", "missing property", "missing compiler", "failed runtime"} {
+		t.Run(scenario, func(t *testing.T) {
+			t.Parallel()
+			root := t.TempDir()
+			home := filepath.Join(root, "real JDK", "Contents", "Home")
+			if err := os.MkdirAll(filepath.Join(home, "bin"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{"java", "javac"} {
+				if name == "javac" && scenario == "missing compiler" {
+					continue
+				}
+				if err := os.WriteFile(filepath.Join(home, "bin", name), []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			body := "#!/bin/sh\nprintf '    java.home = %s\\n' \"$REPORTED_HOME\" >&2\n"
+			if scenario == "missing property" {
+				body = "#!/bin/sh\nprintf 'java version fixture\\n' >&2\n"
+			}
+			if scenario == "failed runtime" {
+				body += "exit 7\n"
+			}
+			launcher := filepath.Join(root, "launcher")
+			if err := os.WriteFile(launcher, []byte(body), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			reported := home
+			if scenario == "relative home" {
+				reported = "relative/jdk"
+			}
+			got, err := inspectJavaHome(t.Context(), launcher, []string{"REPORTED_HOME=" + reported})
+			if scenario != "launcher" {
+				if err == nil {
+					t.Fatalf("unusable JDK was accepted: %q", got)
+				}
+
+				return
+			}
+			if err != nil || got != home {
+				t.Fatalf("runtime home = %q, %v; want reported JDK %q", got, err, home)
+			}
+		})
+	}
 }

@@ -4,15 +4,27 @@
 
 set -euo pipefail
 
+# The evidence scripts run on the Linux CI runner and use GNU stat/du sizes.
+# Refuse BSD utilities up front rather than measuring nothing later.
+if ! stat -c '%s' "${BASH_SOURCE[0]}" >/dev/null 2>&1 || ! du -sb "${BASH_SOURCE[0]}" >/dev/null 2>&1; then
+	# shellcheck disable=SC2016 # Print the literal command for the operator.
+	printf 'blackbox contract: GNU coreutils stat/du required; on macOS: sudo port install coreutils findutils, then PATH="/opt/local/libexec/gnubin:$PATH"\n' >&2
+	exit 2
+fi
+
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+# TestMain takes its cache lock before rejecting an invalid profile. Keep these
+# negative probes independent of a running suite and its persistent caches.
+export TMPDIR="$tmp"
 
 # The compatibility workflow runs this before the suite; forge-ci's
 # workflows ran it at their pinned companion commit. Keep the companion's
 # moving drift target aligned with forge-ci's primary branch while the
 # parent workflows retain their immutable companion pin.
 integration=$(<"$root/.github/workflows/integration.yml")
+# shellcheck disable=SC2016 # Match literal workflow expressions, not shell expansions.
 for expected in \
 	'DEFAULT_REPOSITORY: ${{ vars.FORGE_CI_REPOSITORY || '"'diggsweden/forge-ci'"' }}' \
 	'DEFAULT_REF: ${{ vars.FORGE_CI_REF || '"'main'"' }}' \
@@ -67,7 +79,8 @@ stream_seen=$(
 		printf 'event-%s-abcdefghijklmnop\n' "$number"
 	done | "$root/scripts/retain-bounded-stream.sh" "$stream/strict-blackbox.jsonl" 256
 )
-if (($(stat -c '%s' "$stream/strict-blackbox.jsonl") > 256)); then
+stream_size=$(stat -c '%s' "$stream/strict-blackbox.jsonl")
+if ((stream_size > 256)); then
 	printf 'blackbox contract: retained stream exceeds its byte limit\n' >&2
 	exit 1
 fi
@@ -101,7 +114,8 @@ if [[ ! -s "$per_file/strict-blackbox.jsonl" ]]; then
 	printf 'blackbox contract: bounding one evidence file discarded the rest of the bundle\n' >&2
 	exit 1
 fi
-if (($(du -sb "$per_file" | cut -f1) > 15728640)); then
+per_file_size=$(du -sb "$per_file" | cut -f1)
+if ((per_file_size > 15728640)); then
 	printf 'blackbox contract: bounded evidence still exceeds the artifact limit\n' >&2
 	exit 1
 fi

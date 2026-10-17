@@ -81,6 +81,15 @@ test binary but does not build forge-ci or run the suite. It:
 
 It needs no providers, network access, containers, or large permanent
 fixtures.
+Its negative probes use a private temporary root, so they can run while a
+developer suite holds its own cache lock. The evidence scripts exercise GNU
+coreutils and findutils semantics. On macOS use MacPorts Bash and those utilities:
+
+```bash
+sudo port install bash coreutils findutils
+PATH="/opt/local/libexec/gnubin:/opt/local/bin:$PATH" \
+  mise exec -- bash scripts/validate-strict-profile-contract.sh
+```
 
 ## just recipes
 

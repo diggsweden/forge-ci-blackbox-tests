@@ -30,8 +30,11 @@ binary invocation, then layers the per-test overrides on top:
 - Per-test scratch dirs come from `t.TempDir()`, which Go removes at the end
   of the test.
 - For GPG tests, `bootstrapGPGKey` creates a throwaway ed25519 key in an
-  isolated `GNUPGHOME` with ultimate ownertrust, so signing works without
-  prompts. `bootstrapRSAGPGKey` makes an RSA-2048 key instead;
+  owned mode-0700 `GNUPGHOME` with ultimate ownertrust, so signing works without
+  prompts. Its short temporary name avoids the Unix-socket limit under long
+  test names. Cleanup stops that keyring's agents before removing the exact
+  created directory; shutdown failures retain the keyring and fail the test.
+  `bootstrapRSAGPGKey` makes an RSA-2048 key instead;
   `TestReleaseSign_GPGSignsAndVerifies` uses it so RSA signing stays covered.
 - For SSH tests, `bootstrapSSHKey` generates a fresh ed25519 keypair plus an
   `allowed_signers` file.

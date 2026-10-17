@@ -73,8 +73,14 @@ func bootstrapRSAGPGKey(t *testing.T) gpgKey {
 func bootstrapGPGKeyOfType(t *testing.T, keyType string) gpgKey {
 	t.Helper()
 	requireTool(t, "gpg")
+	requireTool(t, "gpgconf")
 
-	dir := t.TempDir()
+	// GPG creates Unix sockets beneath this directory. Test-name-based paths
+	// can exceed the socket limit under macOS or a CI runner's temporary root.
+	dir, err := os.MkdirTemp("", "fc-gpg-") //nolint:usetesting // A short owned directory is required for GPG's Unix sockets.
+	if err != nil {
+		t.Fatalf("create private keyring: %v", err)
+	}
 	gpgEnv := map[string]string{"GNUPGHOME": dir}
 	// gpg starts an agent per keyring; stop it before the directory goes.
 	// Not via toolCommand: t.Context() is already cancelled in cleanup.
@@ -84,7 +90,7 @@ func bootstrapGPGKeyOfType(t *testing.T, keyType string) gpgKey {
 
 		gpgconf := lookupTool("gpgconf")
 		if gpgconf == "" {
-			t.Logf("gpgconf not found; the gpg-agent for %s may outlive the test", dir)
+			t.Errorf("gpgconf disappeared; keyring retained at %s", dir)
 
 			return
 		}
@@ -94,7 +100,14 @@ func bootstrapGPGKeyOfType(t *testing.T, keyType string) gpgKey {
 		cmd.WaitDelay = time.Second
 
 		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Logf("gpgconf --kill all: %v\n%s", err, out)
+			t.Errorf("stop test GPG agents; keyring retained at %s: %v\n%s", dir, err, out)
+
+			return
+		}
+		// The deletion target is exactly the directory created above, never
+		// a caller-supplied path or the developer's keyring.
+		if err := os.RemoveAll(dir); err != nil {
+			t.Errorf("remove owned keyring %s: %v", dir, err)
 		}
 	})
 
@@ -152,6 +165,28 @@ Expire-Date: 0
 	exportArmored(t, dir, key.keyID, key.publicASC, "--export")
 
 	return key
+}
+
+func TestBootstrapKey_LongScenarioNameAndCleanup(t *testing.T) {
+	t.Parallel()
+	requireTool(t, "gpg")
+	requireTool(t, "gpgconf")
+
+	var keyring string
+	t.Run("a descriptive nested scenario name must not become the agent socket directory name", func(t *testing.T) {
+		key := bootstrapGPGKey(t)
+		keyring = key.gnupgHome
+		info, err := os.Stat(keyring)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Mode().Perm() != 0o700 {
+			t.Fatalf("keyring permissions = %v, want owner-only", info.Mode())
+		}
+	})
+	if _, err := os.Stat(keyring); !os.IsNotExist(err) {
+		t.Fatalf("keyring remains after its scenario: %v", err)
+	}
 }
 
 // TestBootstrapKeys_AreDistinctPerCall pins the premise that roughly fifteen

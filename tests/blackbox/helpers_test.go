@@ -208,8 +208,8 @@ func outputOrFatal(t *testing.T, cmd *exec.Cmd) string {
 // $HOME/.rustup rather than exporting it. Every other install-location
 // passthrough here can rely on the variable being set; this one cannot.
 //
-// The real home is read from the OS, not from $HOME, so it is unaffected by
-// the redirect this file performs. Returning "" when the directory is absent
+// The caller's home is read before constructing the child's redirected HOME;
+// isolatedEnv does not change the process environment. Returning "" when absent
 // keeps non-rustup hosts (a distro cargo, a mise-managed toolchain) on the
 // existing path, where the variable is simply not set.
 func defaultRustupHome() string {
@@ -481,16 +481,23 @@ func TestIsolatedEnv_DoesNotLeakTheHostEnvironment(t *testing.T) {
 // redirected. rustup does not export RUSTUP_HOME, so without the fallback the
 // shim resolves ~/.rustup under the isolated home, finds no default toolchain,
 // and every cargo probe fails as if the tool were broken.
-func TestIsolatedEnv_FallsBackToTheRealRustupHome(t *testing.T) {
-	rustup := defaultRustupHome()
-	if rustup == "" {
-		t.Skip("host has no ~/.rustup; the fallback has nothing to supply")
+func TestIsolatedEnv_RustupFallbackUsesCallerHome(t *testing.T) {
+	// Resolve the shared tool PATH before changing HOME for this fixture.
+	_ = miseBinPaths()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("RUSTUP_HOME", "")
+	if _, present := envMap(isolatedEnv(nil))["RUSTUP_HOME"]; present {
+		t.Fatal("an absent caller toolchain was exposed to the child")
 	}
 
-	t.Setenv("RUSTUP_HOME", "")
+	rustup := filepath.Join(home, ".rustup")
+	if err := os.Mkdir(rustup, 0o700); err != nil {
+		t.Fatal(err)
+	}
 
 	if got := envMap(isolatedEnv(nil))["RUSTUP_HOME"]; got != rustup {
-		t.Errorf("RUSTUP_HOME = %q, want the real home's rustup directory %q", got, rustup)
+		t.Errorf("RUSTUP_HOME = %q, want the caller's rustup directory %q", got, rustup)
 	}
 
 	// An explicit host value still wins: the fallback fills a gap, it does not
