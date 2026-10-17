@@ -11,5 +11,16 @@ minimum_release_age = "7d"
 # The module's toolchain: golangci-lint type-checks against the Go on PATH, and
 # a newer mise-global Go than the linter supports breaks that check.
 go = "1.27.2"
+# The default Go release build generates a build SBOM; match CI's generator.
+"go:github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod" = "1.10.0"
+# Match the compatibility workflow's JDK; macOS /usr/bin/java is a launcher,
+# not an installed JDK, and Maven/Gradle need a real runtime before execution.
+java = "temurin-25.0.2+10.0.LTS"
 maven = "3.9.16"
 node = "26.8.2"
+# Native SBOM/signing tools match the compatibility workflow. The mise
+# environment selects Rust explicitly rather than relying on a global default.
+rust = { version = "1.94.0", profile = "minimal" }
+"cargo:cargo-cyclonedx" = { version = "0.5.9", locked = true }
+"aqua:anchore/syft" = "1.49.0"
+"aqua:sigstore/cosign" = "3.1.3"

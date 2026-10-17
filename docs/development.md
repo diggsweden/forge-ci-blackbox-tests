@@ -58,7 +58,13 @@ subprocesses (`G204`), fixture paths built from `t.TempDir()` (`G304`,
 `G302`, `G306`), and the helper-layer idioms (`nonamedreturns`, `unparam`,
 table-driver complexity). Each exclusion carries its reason in the config.
 
-`.mise.toml` pins just, golangci-lint, Go, Maven and Node using the same
-mise/aqua tool management as forge-ci; the file is the authority for the
-versions. Run `mise install`, then `mise exec -- just lint` (or activate mise
-in the shell).
+`.mise.toml` is the authority for runtime, lint, signing and SBOM-tool versions.
+Java, Rust, Syft, Cosign and the SBOM generators use the compatibility workflow's
+pins. Run `just install-dev-tools`, then `mise exec -- just lint` (or activate
+mise in the shell).
+
+Setup first installs Go, Java and Rust, then activates those pinned runtimes
+with `mise exec --no-deps` while installing the remaining tools. Cargo tools
+therefore build without requiring a global rustup default. Cargo-cyclonedx
+retains its locked dependency build, as in CI. GnuPG is a host-package
+prerequisite; Buildah belongs to the native Linux lane.

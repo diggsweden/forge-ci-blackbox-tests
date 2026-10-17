@@ -44,8 +44,9 @@ A run may download dependencies and base images, and may start containers.
 Caches go under `$TMPDIR` (`~/Library/Caches/forge-ci-blackbox-tests` on
 macOS) and persist between runs; `just clean` removes them.
 
-Linux and BSD are the primary supported targets; macOS and WSL are best
-effort.
+Linux is the reference platform and the only one the strict profile accepts.
+The local profile also runs natively on macOS, matching forge-ci's Linux and
+macOS release targets; WSL is best effort.
 
 ## Using the suite
 

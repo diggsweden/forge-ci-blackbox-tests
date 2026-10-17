@@ -51,7 +51,8 @@ default:
 # ▪ Install the pinned development tools; network
 [group('setup')]
 install-dev-tools:
-    @mise install
+    @mise install go java rust
+    @mise exec --no-deps go java rust -- mise install
 
 # ==================================================================================== #
 # DEVELOPMENT - Composite gates

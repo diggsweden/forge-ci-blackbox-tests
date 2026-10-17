@@ -20,11 +20,32 @@ CI evidence.
 - A checkout of `diggsweden/forge-ci` as a sibling directory, or
   `FORGE_CI_TEST_BINARY` pointing at a pre-built binary.
 - Optional for the default developer profile: `mvn`, `npm`, `cargo`,
-  `buildah`, `gpg`, `syft`, `cyclonedx-gomod`, `cargo-cyclonedx`, and the other
-  tools reported by the suite. Anything missing makes only the dependent tests
+  `buildah`, `gpg`/`gpgconf`, `syft`, `cyclonedx-gomod`, `cargo-cyclonedx`, and
+  other tools reported by the suite. Anything missing makes only the dependent tests
   skip.
 - Linux for the strict profile. Its Buildah, `/proc`, and strict compatibility
-  contracts are not a portable macOS or Windows gate.
+  contracts are not a portable macOS or Windows gate, so its preflight refuses
+  other hosts before building forge-ci.
+
+Run `just install-dev-tools` and use `mise exec -- just ...` when mise is not
+activated. The declared JDK is needed by both Maven and Gradle. macOS's
+`/usr/bin/java` is a system launcher, not proof that a JDK is installed; the
+Gradle fixture queries `java.home` with a bounded runtime probe and checks for
+both `java` and `javac`. It never derives `JAVA_HOME` from a launcher path.
+The default Go build also needs the pinned cyclonedx-gomod SBOM generator.
+Setup also supplies the CI-pinned Rust compiler, cargo-cyclonedx, Syft and
+Cosign. It activates the compiler for Cargo-tool installation without relying
+on a pre-existing rustup default. On macOS, install GnuPG separately with
+`sudo port install gnupg2`; run Buildah scenarios on a matching-architecture
+Linux host. Missing-tool evidence remains visible under the optional profile.
+
+Buildah needs a working OCI runtime such as `crun` or `runc`, and the host's
+normal rootless-user namespace configuration. An absent Buildah skips the
+container scenarios in the developer profile, but a present Buildah that fails
+a build is broken evidence, not missing evidence: the container-first flow
+fails in every profile. The container jobs select
+the native CPU architecture explicitly: AMD64 runs on AMD64 hosts, ARM64 on
+ARM64 hosts. Do not enable cross-architecture emulation to satisfy this lane.
 
 ## Commands
 
