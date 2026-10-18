@@ -1,0 +1,24 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+repositories { mavenCentral() }
+
+application {
+    mainClass = 'demo.App'
+}
+
+dependencies {
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+}
+
+// Reproducible-build settings — Gradle does NOT honour these by
+// default. Without preserveFileTimestamps=false, every entry in the
+// JAR central directory gets the wall-clock mtime, breaking
+// byte-identical rebuilds. reproducibleFileOrder=true sorts the zip
+// entries so two builds on different filesystems agree.
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}

@@ -1,0 +1,14 @@
+subprojects {
+    apply plugin: 'java-library'
+    apply plugin: 'maven-publish'
+    group = 'se.digg.fixture'
+    version = providers.gradleProperty('version').get()
+
+    publishing {
+        publications {
+            library(MavenPublication) {
+                from components.java
+            }
+        }
+    }
+}

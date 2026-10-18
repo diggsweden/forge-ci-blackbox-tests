@@ -1,0 +1,10 @@
+<settings>
+  <profiles>
+    <profile>
+      <id>publication-metadata</id>
+      <properties>
+        <fixture.version>1.2.3-SNAPSHOT</fixture.version>
+      </properties>
+    </profile>
+  </profiles>
+</settings>

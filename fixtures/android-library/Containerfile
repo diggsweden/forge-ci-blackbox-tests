@@ -1,0 +1,21 @@
+FROM ghcr.io/cirruslabs/android-sdk:35@sha256:c724009e305b4607157287624033ab97f319af44c244bfc9f73b6293f3bb01b9 AS build
+USER root
+ARG JVM_PROXY_OPTS
+ENV JAVA_TOOL_OPTIONS=$JVM_PROXY_OPTS
+WORKDIR /workspace
+COPY forge-ci /usr/local/bin/forge-ci
+COPY . .
+RUN --mount=type=cache,target=/root/.gradle \
+    forge-ci build gradle-android run --library --build-module lib \
+      --name-override library --skip-tests --sbom-tool-version 3.2.1 \
+    && forge-ci build gradle export-publications \
+      --output publication --version 1.2.3 --central \
+    && forge-ci version bump --project-type gradle-android \
+      --library --version 1.2.4-SNAPSHOT \
+    && forge-ci build gradle export-publications \
+      --output snapshot-publication --snapshot
+
+FROM scratch
+COPY --from=build /workspace/publication/ /publication/
+COPY --from=build /workspace/snapshot-publication/ /snapshot-publication/
+COPY --from=build /workspace/build/reports/cyclonedx/bom.json /bom.json
