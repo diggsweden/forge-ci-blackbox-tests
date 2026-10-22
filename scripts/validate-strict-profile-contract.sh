@@ -21,23 +21,35 @@ export TMPDIR="$tmp"
 
 # The compatibility workflow runs this before the suite; forge-ci's
 # workflows ran it at their pinned companion commit. Keep the companion's
-# moving drift target aligned with forge-ci's primary branch while the
-# parent workflows retain their immutable companion pin.
-integration=$(<"$root/.github/workflows/integration.yml")
+# repository/ref overrides available while the parent workflows retain their
+# immutable companion pin. A fork may change the literal fallback coordinates
+# without changing this contract check.
+# Forgejo gives its workflow directory precedence when both provider layers
+# are retained. Check the active compatibility file, not the inert GitHub copy.
+workflow="$root/.github/workflows/integration.yml"
+if [[ -d "$root/.forgejo/workflows" ]]; then
+	workflow="$root/.forgejo/workflows/integration.yml"
+fi
+if [[ ! -f "$workflow" ]]; then
+	printf 'blackbox contract: missing compatibility workflow %s\n' "$workflow" >&2
+	exit 1
+fi
+integration=$(<"$workflow")
 # shellcheck disable=SC2016 # Match literal workflow expressions, not shell expansions.
 for expected in \
-	'DEFAULT_REPOSITORY: ${{ vars.FORGE_CI_REPOSITORY || '"'diggsweden/forge-ci'"' }}' \
-	'DEFAULT_REF: ${{ vars.FORGE_CI_REF || '"'main'"' }}' \
-	"inputs['forge-ci-ref'] || vars.FORGE_CI_REF || 'main'"; do
+	'DEFAULT_REPOSITORY: ${{ vars.FORGE_CI_REPOSITORY || ' \
+	'DEFAULT_REF: ${{ vars.FORGE_CI_REF || ' \
+	"inputs['forge-ci-ref'] || vars.FORGE_CI_REF || "; do
 	if [[ "$integration" != *"$expected"* ]]; then
 		printf 'blackbox contract: integration workflow is missing primary-ref guard %s\n' "$expected" >&2
 		exit 1
 	fi
 done
-printf 'blackbox contract: companion drift target is FORGE_CI_REF or forge-ci main\n'
+printf 'blackbox contract: companion drift target supports repository/ref overrides\n'
 
 (
 	cd "$root"
+	go test ./scripts/
 	go test -c -tags=blackbox -o "$tmp/blackbox-contract.test" ./tests/blackbox/
 )
 
