@@ -746,6 +746,25 @@ func requireTool(t *testing.T, name string) {
 	}
 }
 
+// requireWorkingTool is requireTool plus a smoke run: some runners ship
+// proxy shims (e.g. rustup's cargo on ubuntu-26.04) that are on PATH and
+// executable but fail at runtime because no default toolchain is set.
+// Running the tool with the given args catches that as "absent" rather
+// than letting the test fail with a cryptic error from the shim.
+func requireWorkingTool(t *testing.T, name string, args ...string) {
+	t.Helper()
+
+	path := lookupTool(name)
+	if path == "" {
+		skipInOptionalProfilef(t, "%s is not on PATH", name)
+	}
+
+	cmd := exec.CommandContext(t.Context(), path, args...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		skipInOptionalProfilef(t, "%s is on PATH but failed to run: %v\n%s", name, err, out)
+	}
+}
+
 func skipInOptionalProfilef(t *testing.T, format string, args ...any) {
 	t.Helper()
 

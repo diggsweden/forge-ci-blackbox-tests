@@ -72,7 +72,7 @@ func assertNativeLinuxArtifact(t *testing.T, path string) {
 //   - the syft analyzed-binary SBOM lands next to it
 //   - checksums + sign work through the real local CLI and tools
 func TestFlow_ContainerFirst_Cargo(t *testing.T) {
-	requireTool(t, "cargo")
+	requireWorkingTool(t, "cargo", "--version")
 	requireTool(t, "cargo-cyclonedx")
 	requireTool(t, "buildah")
 	requireTool(t, "syft")

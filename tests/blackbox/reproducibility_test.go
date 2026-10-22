@@ -157,7 +157,7 @@ func TestGradleArchives_Reproducible(t *testing.T) {
 // Cargo doesn't directly read SOURCE_DATE_EPOCH for the binary, but
 // for a fixed toolchain + lockfile the output is deterministic.
 func TestCargoBinary_Reproducible(t *testing.T) {
-	requireTool(t, "cargo")
+	requireWorkingTool(t, "cargo", "--version")
 
 	build := func() string {
 		proj := copyTree(t, fixture("cargo-hello"))
@@ -192,7 +192,7 @@ func TestCargoBinary_Reproducible(t *testing.T) {
 // for registry-integrity validators that re-package a tag and
 // compare hashes.
 func TestCargoCrate_Reproducible(t *testing.T) {
-	requireTool(t, "cargo")
+	requireWorkingTool(t, "cargo", "--version")
 
 	pack := func() string {
 		proj := copyTree(t, fixture("cargo-hello"))
