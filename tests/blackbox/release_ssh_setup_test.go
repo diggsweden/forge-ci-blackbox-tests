@@ -65,7 +65,7 @@ func TestReleaseSSHSetup_WritesAConfigThatProducesASignedTag(t *testing.T) {
 	gitAt(t, repo, "tag", "-s", "-m", "release v3.0.0", "v3.0.0")
 
 	stdout, stderr, code := run(t, runOpts{dir: repo},
-		"validate", "tag", "signature", "--tag", "v3.0.0", "--repository", "diggsweden/integration")
+		"validate", "tag", "signature", "--tag", "v3.0.0", "--repository", "fixture/integration")
 	if code != 0 {
 		t.Fatalf("validate tag signature exit %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}

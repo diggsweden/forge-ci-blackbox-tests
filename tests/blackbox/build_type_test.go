@@ -137,9 +137,9 @@ func TestBuildType_NPMPack(t *testing.T) {
 		t.Fatalf("expected exactly one .tgz, got %d: %v", len(matches), matches)
 	}
 
-	// Scoped package shape: @diggsweden/npm-lib → diggsweden-npm-lib-0.1.0.tgz
+	// Scoped package shape: @fixture/npm-lib → fixture-npm-lib-0.1.0.tgz
 	base := filepath.Base(matches[0])
-	if !strings.HasPrefix(base, "diggsweden-npm-lib-") || !strings.HasSuffix(base, ".tgz") {
+	if !strings.HasPrefix(base, "fixture-npm-lib-") || !strings.HasSuffix(base, ".tgz") {
 		t.Errorf("unexpected tarball name %q", base)
 	}
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@diggsweden/npm-lib",
+  "name": "@fixture/npm-lib",
   "version": "0.1.0",
   "description": "test fixture: NPM library shape (no build script)",
   "license": "CC0-1.0",

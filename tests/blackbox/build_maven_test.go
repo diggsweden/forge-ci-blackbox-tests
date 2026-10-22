@@ -33,7 +33,7 @@ func TestMavenMetadata_SingleModule(t *testing.T) {
 		t.Errorf("version = %q, want 1.0.0", got.Version)
 	}
 
-	if got.GroupID != "se.digg.test" {
+	if got.GroupID != "org.example.test" {
 		t.Errorf("group-id = %q", got.GroupID)
 	}
 

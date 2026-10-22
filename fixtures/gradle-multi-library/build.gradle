@@ -1,7 +1,7 @@
 subprojects {
     apply plugin: 'java-library'
     apply plugin: 'maven-publish'
-    group = 'se.digg.fixture'
+    group = 'org.example.fixture'
     version = providers.gradleProperty('version').get()
 
     publishing {

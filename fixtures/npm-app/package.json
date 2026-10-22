@@ -1,5 +1,5 @@
 {
-  "name": "@diggsweden/npm-app",
+  "name": "@fixture/npm-app",
   "version": "0.1.0",
   "description": "test fixture: NPM application shape (has a build script)",
   "license": "CC0-1.0",

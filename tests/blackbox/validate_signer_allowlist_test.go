@@ -30,7 +30,7 @@ import (
 func runValidateTagSignature(t *testing.T, dir, tag string, requireAllowlistedSigner bool, env map[string]string) (stdout, stderr string, exitCode int) {
 	t.Helper()
 
-	args := []string{"validate", "tag", "signature", "--tag", tag, "--repository", "diggsweden/integration"}
+	args := []string{"validate", "tag", "signature", "--tag", tag, "--repository", "fixture/integration"}
 	if requireAllowlistedSigner {
 		args = append([]string{"--format", "github"}, args...)
 		env = mergeEnv(env, map[string]string{"REQUIRE_ALLOWLISTED_SIGNER": "true"})

@@ -35,9 +35,9 @@ func TestContainerLedger_AddAndValidate(t *testing.T) {
 			"--ledger", ledger,
 			"--tag", "v1.2.3",
 			"--role", "distroless",
-			"--ref", "ghcr.io/diggsweden/demo@"+dig,
+			"--ref", "ghcr.io/fixture/demo@"+dig,
 			"--digest", dig,
-			"--final-tag", "ghcr.io/diggsweden/demo:v1.2.3",
+			"--final-tag", "ghcr.io/fixture/demo:v1.2.3",
 			"--sbom", "dist/image-sbom-amd64.cyclonedx.json",
 		)
 
@@ -57,7 +57,7 @@ func TestContainerLedger_AddAndValidate(t *testing.T) {
 		t.Fatalf("ledger entries = %d, want 1", len(entries))
 	}
 
-	if entries[0]["digest"] != dig || entries[0]["final_tag"] != "ghcr.io/diggsweden/demo:v1.2.3" {
+	if entries[0]["digest"] != dig || entries[0]["final_tag"] != "ghcr.io/fixture/demo:v1.2.3" {
 		t.Errorf("recorded entry = %+v", entries[0])
 	}
 
@@ -91,7 +91,7 @@ func TestContainerLedger_AddAndValidate(t *testing.T) {
 	}
 
 	assertContains(t, "ledger validate (wrong tag)", stderr,
-		`final_tag "ghcr.io/diggsweden/demo:v1.2.3" must be scoped to release tag "v9.9.9"`)
+		`final_tag "ghcr.io/fixture/demo:v1.2.3" must be scoped to release tag "v9.9.9"`)
 
 	// A malformed digest is rejected at add time, not silently recorded — and
 	// the message names the digest rule, so this cannot pass on some other
@@ -100,9 +100,9 @@ func TestContainerLedger_AddAndValidate(t *testing.T) {
 		"container", "ledger", "add",
 		"--ledger", filepath.Join(t.TempDir(), "bad.json"),
 		"--tag", "v1.2.3",
-		"--ref", "ghcr.io/diggsweden/demo@"+dig,
+		"--ref", "ghcr.io/fixture/demo@"+dig,
 		"--digest", "sha256:short",
-		"--final-tag", "ghcr.io/diggsweden/demo:v1.2.3")
+		"--final-tag", "ghcr.io/fixture/demo:v1.2.3")
 	if code != exitValidation {
 		t.Errorf("ledger add (bad digest) exit=%d, want 1 (EX_VALIDATION)", code)
 	}
@@ -175,8 +175,8 @@ func TestContainerLedger_MergeDedupes(t *testing.T) {
 
 	ledgerA := filepath.Join(dir, "a.json")
 	ledgerB := filepath.Join(dir, "b.json")
-	seed(ledgerA, "api", "ghcr.io/diggsweden/api", digA)
-	seed(ledgerB, "worker", "ghcr.io/diggsweden/worker", digB)
+	seed(ledgerA, "api", "ghcr.io/fixture/api", digA)
+	seed(ledgerB, "worker", "ghcr.io/fixture/worker", digB)
 
 	// Two distinct single-entry ledgers merge into one two-entry ledger.
 	merged := filepath.Join(dir, "merged.json")

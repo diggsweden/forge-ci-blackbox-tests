@@ -31,7 +31,7 @@ var provenanceEnv = map[string]string{
 	// selects the forge API, not the runner.
 	"GITHUB_ACTIONS":    "true",
 	"GITHUB_SERVER_URL": "https://github.com",
-	"GITHUB_REPOSITORY": "itiquette/example",
+	"GITHUB_REPOSITORY": "fixture/example",
 	"GITHUB_REF_NAME":   "v1.2.3",
 	"GITHUB_SHA":        strings.Repeat("2", 40), //nolint:mnd // 40-hex commit SHA
 	"GITHUB_RUN_ID":     "4242",                  // gives a non-empty builder/invocation id
@@ -128,7 +128,7 @@ func TestProvenance_GeneratesStatement(t *testing.T) {
 		t.Errorf("statement has %d subjects, want exactly %d: %v", len(stmt.Subject), len(want), got)
 	}
 
-	if src := stmt.Predicate.BuildDefinition.ExternalParameters["source"]; src != "git+https://github.com/itiquette/example" {
+	if src := stmt.Predicate.BuildDefinition.ExternalParameters["source"]; src != "git+https://github.com/fixture/example" {
 		t.Errorf("externalParameters.source = %v", src)
 	}
 

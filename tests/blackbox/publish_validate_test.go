@@ -33,7 +33,7 @@ func TestPublishNPMWriteNPMRC_ScopedBodyAndPerms(t *testing.T) {
 	_, stderr, code := run(t, runOpts{dir: proj},
 		"publish", "npm", "write-npmrc",
 		"--registry", "https://registry.npmjs.org",
-		"--scope", "@diggsweden",
+		"--scope", "@fixture",
 		"--output", ".npmrc")
 	if code != 0 {
 		t.Fatalf("write-npmrc exit %d\nstderr: %s", code, stderr)
@@ -44,7 +44,7 @@ func TestPublishNPMWriteNPMRC_ScopedBodyAndPerms(t *testing.T) {
 	body := readFile(t, npmrc)
 	for _, line := range []string{
 		"//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}",
-		"@diggsweden:registry=https://registry.npmjs.org",
+		"@fixture:registry=https://registry.npmjs.org",
 	} {
 		assertContains(t, ".npmrc", body, line)
 	}

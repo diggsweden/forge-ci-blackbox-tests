@@ -3,7 +3,7 @@ plugins {
     id 'maven-publish'
 }
 
-group = 'se.digg.test'
+group = 'org.example.test'
 
 java {
     withSourcesJar()

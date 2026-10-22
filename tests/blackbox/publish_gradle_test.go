@@ -73,7 +73,7 @@ func TestGradlePublicationMultiProjectBoundaries(t *testing.T) {
 				t.Fatalf("export: %d: %s", code, stderr)
 			}
 			for _, module := range []string{"alpha", "beta"} {
-				pom := filepath.Join(out, "se/digg/fixture", module, "2.1.0", module+"-2.1.0.pom")
+				pom := filepath.Join(out, "org/example/fixture", module, "2.1.0", module+"-2.1.0.pom")
 				if !fileExists(pom) {
 					t.Errorf("missing exported module %s", module)
 				}
@@ -91,7 +91,7 @@ func TestGradlePublicationExportsResolvedRepository(t *testing.T) {
 		t.Fatalf("Gradle publication export: %d: %s", code, stderr)
 	}
 	for _, suffix := range []string{".pom", ".jar", "-sources.jar", "-javadoc.jar"} {
-		filename := filepath.Join(out, "se", "digg", "test", "gradle-library", "2.1.0", "gradle-library-2.1.0"+suffix)
+		filename := filepath.Join(out, "org", "example", "test", "gradle-library", "2.1.0", "gradle-library-2.1.0"+suffix)
 		if !fileExists(filename) {
 			t.Errorf("missing resolved publication %s", filename)
 		}
@@ -123,10 +123,10 @@ func TestGradlePublicationSelectsExactProject(t *testing.T) {
 			if code != 0 {
 				t.Fatalf("selected project export: %d: %s", code, stderr)
 			}
-			if !fileExists(filepath.Join(out, "se/digg/fixture/alpha", version, "alpha-"+version+".pom")) {
+			if !fileExists(filepath.Join(out, "org/example/fixture/alpha", version, "alpha-"+version+".pom")) {
 				t.Fatal("selected publication missing")
 			}
-			entries, err := os.ReadDir(filepath.Join(out, "se/digg/fixture"))
+			entries, err := os.ReadDir(filepath.Join(out, "org/example/fixture"))
 			if err != nil || len(entries) != 1 || entries[0].Name() != "alpha" {
 				t.Fatalf("unexpected exported projects: %v: %v", entries, err)
 			}

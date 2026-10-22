@@ -211,7 +211,7 @@ func TestRenderChangelog_BackendsAndSecretHygiene(t *testing.T) {
 	} {
 		t.Run(tc.backend, func(t *testing.T) {
 			repo, fakeBin, renderLog := renderFixture(t)
-			repositoryURL := "https://forgejo.example/itiquette/consumer"
+			repositoryURL := "https://forgejo.example/fixture/consumer"
 
 			_, stderr, code := run(t, runOpts{
 				dir: repo,

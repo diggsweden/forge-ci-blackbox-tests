@@ -549,8 +549,8 @@ func TestFlow_ArtifactFirst_NPM(t *testing.T) {
 	// --sbom-dir is a no-op for checksums, so without the SBOM rows a silently
 	// SBOM-less assemble step would pass the cascade.
 	assertChecksumManifestLists(t, filepath.Join(proj, "checksums.sha256"), filepath.Base(tgz[0]),
-		"diggsweden-npm-lib-0.1.0-analyzed-tararchive-sbom.spdx.json",
-		"diggsweden-npm-lib-0.1.0-analyzed-tararchive-sbom.cyclonedx.json")
+		"fixture-npm-lib-0.1.0-analyzed-tararchive-sbom.spdx.json",
+		"fixture-npm-lib-0.1.0-analyzed-tararchive-sbom.cyclonedx.json")
 
 	if _, stderr, code := run(t, runOpts{
 		dir: proj,

@@ -30,7 +30,7 @@ artifacts:
 
 	stdout, stderr, code := run(t, runOpts{dir: repo, env: map[string]string{
 		"GITHUB_ACTIONS":    "true",
-		"GITHUB_REPOSITORY": "diggsweden/integration",
+		"GITHUB_REPOSITORY": "fixture/integration",
 	}}, "doctor", "--root", ".")
 
 	// doctor exits 0 for advisories/warnings.
@@ -65,7 +65,7 @@ git-signing:
 
 	stdout, stderr, code := run(t, runOpts{dir: repo, env: map[string]string{
 		"GITHUB_ACTIONS":    "true",
-		"GITHUB_REPOSITORY": "diggsweden/integration",
+		"GITHUB_REPOSITORY": "fixture/integration",
 	}}, "doctor", "--root", ".")
 
 	// The allowlist check is a warning, not a failure.
@@ -98,7 +98,7 @@ git-signing:
 
 	stdout, stderr, code := run(t, runOpts{dir: repo, env: map[string]string{
 		"GITHUB_ACTIONS":    "true",
-		"GITHUB_REPOSITORY": "diggsweden/integration",
+		"GITHUB_REPOSITORY": "fixture/integration",
 	}}, "doctor", "--root", ".")
 
 	if code != exitValidation { // EX_VALIDATION: failing doctor check

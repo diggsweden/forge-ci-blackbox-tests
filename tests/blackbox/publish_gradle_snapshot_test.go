@@ -130,7 +130,7 @@ func TestGradleSnapshotExportAndRepeatedNativeDeployment(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	base := "/api/packages/fixture/maven/se/digg/test/gradle-library/2.1.1-SNAPSHOT/"
+	base := "/api/packages/fixture/maven/org/example/test/gradle-library/2.1.1-SNAPSHOT/"
 	var metadata struct {
 		BuildNumber int `xml:"versioning>snapshot>buildNumber"`
 		Versions    []struct {

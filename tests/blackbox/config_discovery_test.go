@@ -105,7 +105,7 @@ func TestConfig_AutoDerivesFromSingleMavenManifest(t *testing.T) {
 	pom := []byte(`<?xml version="1.0"?>
 <project>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>se.digg.test</groupId>
+  <groupId>org.example.test</groupId>
   <artifactId>my-app</artifactId>
   <version>1.0.0</version>
 </project>`)

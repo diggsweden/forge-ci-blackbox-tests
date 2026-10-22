@@ -59,7 +59,7 @@ func TestTagSignature_GPGVerifies(t *testing.T) {
 			"GNUPGHOME":              key.gnupgHome,
 			"RELEASE_GPG_PUBLIC_KEY": string(pub),
 		},
-	}, "validate", "tag", "signature", "--tag", "v1.0.0", "--repository", "diggsweden/integration")
+	}, "validate", "tag", "signature", "--tag", "v1.0.0", "--repository", "fixture/integration")
 	if code != 0 {
 		t.Fatalf("validate tag signature exit %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}
@@ -100,7 +100,7 @@ func TestTagSignature_RejectsLightweight(t *testing.T) {
 	})
 
 	_, stderr, code := run(t, runOpts{dir: repo},
-		"validate", "tag", "signature", "--tag", "v0.0.1-lightweight", "--repository", "diggsweden/integration")
+		"validate", "tag", "signature", "--tag", "v0.0.1-lightweight", "--repository", "fixture/integration")
 	if code != exitValidation { // EX_VALIDATION: a lightweight tag is a policy failure, not a usage error
 		t.Fatalf("validate tag signature exit = %d for lightweight tag, want 1\nstderr: %s", code, stderr)
 	}
@@ -138,7 +138,7 @@ func TestTagSignature_SSHSignedTagIsAccepted(t *testing.T) {
 	})
 
 	stdout, stderr, code := run(t, runOpts{dir: repo},
-		"validate", "tag", "signature", "--tag", "v2.0.0", "--repository", "diggsweden/integration")
+		"validate", "tag", "signature", "--tag", "v2.0.0", "--repository", "fixture/integration")
 	if code != 0 {
 		t.Fatalf("validate tag signature exit %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
 	}

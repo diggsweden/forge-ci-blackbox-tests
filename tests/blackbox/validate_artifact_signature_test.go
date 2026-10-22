@@ -47,7 +47,7 @@ exit 1
 	_, stderr, code := run(t, runOpts{dir: dir, env: map[string]string{
 		"PATH":              fakeBin + string(os.PathListSeparator) + suitePATH(),
 		"GITHUB_ACTIONS":    "true",
-		"GITHUB_REPOSITORY": "diggsweden/integration",
+		"GITHUB_REPOSITORY": "fixture/integration",
 		"GITHUB_SERVER_URL": "https://github.com",
 	}}, "validate", "artifact-signature", "--artifact", art, "--method", "sigstore")
 
@@ -89,7 +89,7 @@ exit 1
 	if identityLine == "" {
 		t.Errorf("no cosign invocation carried --certificate-identity-regexp; got:\n%s", argv)
 	} else {
-		if !strings.Contains(identityLine, "diggsweden/integration") {
+		if !strings.Contains(identityLine, "fixture/integration") {
 			t.Errorf("--certificate-identity-regexp is not anchored to the forge repository; got:\n%s", identityLine)
 		}
 

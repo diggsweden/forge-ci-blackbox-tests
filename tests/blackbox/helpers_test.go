@@ -587,7 +587,7 @@ func TestMaven_IgnoresAmbientUserSettings(t *testing.T) {
 	pom := `<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>se.digg.test</groupId>
+  <groupId>org.example.test</groupId>
   <artifactId>settings-isolation</artifactId>
   <version>1.0.0</version>
 </project>

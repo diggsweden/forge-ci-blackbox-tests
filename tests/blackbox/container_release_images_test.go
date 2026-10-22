@@ -66,7 +66,7 @@ func seedReleaseImages(t *testing.T, tag string) releaseImagesFixture {
 	t.Cleanup(srv.Close)
 
 	host := srv.Listener.Addr().String()
-	image := host + "/diggsweden/demo"
+	image := host + "/fixture/demo"
 	candidate := image + ":staging-" + tag
 
 	img, err := random.Image(1024, 1)
@@ -364,7 +364,7 @@ func TestReleaseImagesRollback_AuthenticatesPackageAPI(t *testing.T) {
 		"--dist-dir", fix.distDir, "--ledger", fix.ledger, "--journal", fix.journal,
 		"--tag", "v1.2.3", "--stage", "release", "--registry", fix.host,
 		"--registry-username", "tester", "--expected-image-repository", fix.image,
-		"--server-url", api.URL, "--repository", "diggsweden/demo",
+		"--server-url", api.URL, "--repository", "fixture/demo",
 	)
 	if code != exitNoPerm {
 		t.Fatalf("rollback with a refusing package API: exit=%d, want %d; stderr=%s", code, exitNoPerm, stderr)
@@ -372,7 +372,7 @@ func TestReleaseImagesRollback_AuthenticatesPackageAPI(t *testing.T) {
 
 	select {
 	case got := <-requests:
-		const want = "DELETE /api/v1/packages/diggsweden/container/demo/stable | token package-api-fixture"
+		const want = "DELETE /api/v1/packages/fixture/container/demo/stable | token package-api-fixture"
 		if got != want {
 			t.Errorf("package-API request = %q, want %q", got, want)
 		}

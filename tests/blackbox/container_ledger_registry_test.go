@@ -38,7 +38,7 @@ func TestContainerLedger_PromoteAgainstRegistry(t *testing.T) {
 	srv := httptest.NewServer(registry.New())
 	t.Cleanup(srv.Close)
 
-	image := srv.Listener.Addr().String() + "/diggsweden/demo"
+	image := srv.Listener.Addr().String() + "/fixture/demo"
 	candidate := image + ":staging-v1.2.3"
 
 	// Seed the staging candidate and capture its digest — the value the ledger
@@ -120,7 +120,7 @@ func TestContainerLedger_PromoteRefusesARepushedCandidate(t *testing.T) {
 	srv := httptest.NewServer(registry.New())
 	t.Cleanup(srv.Close)
 
-	image := srv.Listener.Addr().String() + "/diggsweden/demo"
+	image := srv.Listener.Addr().String() + "/fixture/demo"
 	candidate := image + ":staging-v1.2.3"
 
 	candRef, err := name.ParseReference(candidate, name.Insecure)
