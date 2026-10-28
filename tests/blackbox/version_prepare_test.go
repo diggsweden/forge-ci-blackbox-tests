@@ -7,19 +7,22 @@
 // happy path: derive-release input validation, the Forgejo output sink,
 // changelog rendering (both backends, with secret-hygiene booby traps), and
 // the full commit-changelog-release orchestration — real git, real SSH
-// commit signing, and a fake `ssh` transport that serves git-receive-pack /
-// git-upload-pack from a local bare repo so the push path runs for real
-// without an sshd.
+// commit signing, a loopback SSH host-key handshake, and a fake `ssh`
+// transport serving git-receive-pack / git-upload-pack from a local bare repo.
 package blackbox
 
 import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // writeFakeTool writes an executable shell script into dir.
@@ -53,7 +56,7 @@ func TestDeriveRelease_RejectsInvalidRefs(t *testing.T) {
 		_, stderr, code := run(t, runOpts{dir: t.TempDir()},
 			"version", "derive-release",
 			"--ref-name", invalid,
-			"--require-release-request", "--require-stable",
+			"--require-release-request", "--release-policy", "stable",
 			"--trailer-mode", "coauthor-only")
 		if code != exitValidation {
 			t.Errorf("derive-release ref %q: exit %d, want 1 (EX_VALIDATION); a usage error or a crash must not stand in for the refusal", invalid, code)
@@ -110,6 +113,36 @@ func TestDeriveRelease_ForgejoOutputSinkKeyParity(t *testing.T) {
 	}
 }
 
+func TestDeriveRelease_PrereleaseRequiresExplicitPolicy(t *testing.T) {
+	t.Parallel()
+	requireTool(t, "git")
+	requireTool(t, "gpg")
+	key := bootstrapGPGKey(t)
+	repo := initGitRepo(t, map[string]string{"GNUPGHOME": key.gnupgHome}, func(repo string, runGit func(args ...string) error) {
+		makeGPGSignedTag(t, runGit, repo, key, "release-request/v2.0.0-beta.1")
+	})
+	for _, policy := range []string{"stable", "stable-prerelease"} {
+		output := filepath.Join(t.TempDir(), "outputs")
+		_, stderr, code := run(t, runOpts{dir: repo, env: map[string]string{
+			"FORGE_CI_RUNNER": "forgejo", "FORGEJO_OUTPUT": output, "GNUPGHOME": key.gnupgHome,
+		}}, "version", "derive-release", "--ref-name", "release-request/v2.0.0-beta.1",
+			"--require-release-request", "--release-policy", policy)
+		if policy == "stable" {
+			if code != exitValidation {
+				t.Fatalf("stable policy exit=%d, want validation refusal: %s", code, stderr)
+			}
+
+			continue
+		}
+		if code != 0 {
+			t.Fatalf("explicit prerelease policy exit=%d: %s", code, stderr)
+		}
+		if got := parseGHAOutputs(t, output)["release-tag"]; got != "v2.0.0-beta.1" {
+			t.Fatalf("release-tag=%q, want exact prerelease", got)
+		}
+	}
+}
+
 // --- G2: render-changelog backend contract + secret hygiene --------------
 
 // renderFixture builds a real repo (main branch, tracked CHANGELOG.md, bare
@@ -128,6 +161,16 @@ func renderFixture(t *testing.T) (repo, fakeBin, renderLog string) {
 		}
 
 		mustGit(t, runGit, "add", "CHANGELOG.md")
+		for _, file := range []string{".chglog/config.yml", ".chglog/body.yml", "cliff.toml", "cliff-body.toml"} {
+			full := filepath.Join(repo, file)
+			if err := os.MkdirAll(filepath.Dir(full), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(full, []byte("# inert renderer fixture\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			mustGit(t, runGit, "add", file)
+		}
 		mustGit(t, runGit, "commit", "-q", "-m", "initial")
 		mustGit(t, runGit, "branch", "-M", "main")
 		mustGit(t, runGit, "remote", "add", "origin", bare)
@@ -255,14 +298,56 @@ func TestRenderChangelog_BackendsAndSecretHygiene(t *testing.T) {
 
 // --- G5: commit-changelog-release, end to end -----------------------------
 
+// Serve a real loopback SSH handshake: host-key inspection now happens in
+// process, so a PATH stub for ssh-keyscan cannot supply the host's identity.
+func prepareHostKeyServer(t *testing.T, keyPath string) (string, string) {
+	t.Helper()
+	key, err := os.ReadFile(keyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var listen net.ListenConfig
+	listener, err := listen.Listen(t.Context(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		for {
+			conn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				return
+			}
+			_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+			config := &ssh.ServerConfig{NoClientAuth: true}
+			config.AddHostKey(signer)
+			server, _, _, handshakeErr := ssh.NewServerConn(conn, config)
+			if handshakeErr == nil {
+				_ = server.Close()
+			}
+			_ = conn.Close()
+		}
+	}()
+	_, port, err := net.SplitHostPort(listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return "127.0.0.1", port
+}
+
 func TestCommitChangelogRelease_SignsPushesAndCleansUp(t *testing.T) {
 	t.Parallel()
 
 	requireTool(t, "git")
 	requireTool(t, "ssh-keygen")
 
-	// Real signing key + real host key; the fingerprint pin is computed the
-	// same way operators do (ssh-keyscan | ssh-keygen -lf -).
+	// Real signing key and host key; derive the fixture's trusted fingerprint
+	// from its public-key file, independently of the network handshake.
 	keyDir := t.TempDir()
 	signKey := filepath.Join(keyDir, "sign_ed25519")
 	hostKey := filepath.Join(keyDir, "host_ed25519")
@@ -274,7 +359,8 @@ func TestCommitChangelogRelease_SignsPushesAndCleansUp(t *testing.T) {
 		}
 	}
 
-	hostPub := strings.TrimSpace(readFile(t, hostKey+".pub"))
+	host, port := prepareHostKeyServer(t, hostKey)
+	gitURL := "ssh://git@" + net.JoinHostPort(host, port) + "/itq/example.git"
 	fpFields := strings.Fields(outputOrFatal(t, toolCommand(t, "", nil, "ssh-keygen", "-lf", hostKey+".pub")))
 	if len(fpFields) < 2 {
 		t.Fatalf("ssh-keygen -lf: unexpected output %q", fpFields)
@@ -309,24 +395,15 @@ func TestCommitChangelogRelease_SignsPushesAndCleansUp(t *testing.T) {
 		}
 	}
 
-	// Fake transport: `ssh-keyscan` answers with the canned host key (the
-	// binary verifies its fingerprint with REAL ssh-keygen), and `ssh`
-	// serves git-receive-pack/git-upload-pack from the local bare repo, so
-	// the push path is real git protocol without an sshd. Both booby-trap
-	// on inherited signing material.
+	// The host key comes from the real handshake above. A fake ssh command
+	// serves Git's upload/receive protocol from the bare repository and
+	// booby-traps inherited signing material.
 	fakeBin := t.TempDir()
 	boobyTrap := `if [ -n "${SSH_SIGNING_KEY:-}" ]; then
   echo "ERROR: transport inherited SSH_SIGNING_KEY" >&2
   exit 97
 fi
 `
-	writeFakeTool(t, fakeBin, "ssh-keyscan", boobyTrap+fmt.Sprintf(`if [ "$#" -ne 5 ] || [ "$1" != "-p" ] || [ "$2" != "2223" ] || [ "$3" != "-t" ] || [ "$4" != "ed25519" ] || [ "$5" != "fakehost.test" ]; then
-  echo "fake ssh-keyscan: unexpected argv: $*" >&2
-  exit 98
-fi
-printf '%%s\n' %s
-`, shellQuote("[fakehost.test]:2223 "+hostPub)))
-
 	sshConfigCopy := filepath.Join(t.TempDir(), "ssh-config")
 	sshConfigPathLog := filepath.Join(t.TempDir(), "ssh-config-path")
 	writeFakeTool(t, fakeBin, "ssh", boobyTrap+fmt.Sprintf(`# Skip ssh options; the trailing argument is the remote command.
@@ -344,8 +421,8 @@ if [ -z "$config" ]; then
   echo "fake ssh: missing -F config" >&2
   exit 98
 fi
-if ! grep -Fqx '  HostName fakehost.test' "$config" ||
-   ! grep -Fqx '  Port 2223' "$config" ||
+if ! grep -Fqx '  HostName %s' "$config" ||
+   ! grep -Fqx '  Port %s' "$config" ||
    ! grep -Fqx '  User git' "$config" ||
    ! grep -Fqx '  StrictHostKeyChecking yes' "$config"; then
   echo "fake ssh: generated config does not carry the required endpoint and strict host checking" >&2
@@ -356,7 +433,7 @@ cp "$config" %s
 
 target="${1:?}"
 shift
-if [ "$target" != "git@fakehost.test" ]; then
+if [ "$target" != "git@%s" ]; then
   echo "fake ssh: unexpected target: $target" >&2
   exit 98
 fi
@@ -369,29 +446,39 @@ case "${cmd}" in
   git-upload-pack*) exec git upload-pack %s ;;
   *) echo "fake ssh: unexpected command: ${cmd}" >&2; exit 1 ;;
 esac
-`, shellQuote(sshConfigPathLog), shellQuote(sshConfigCopy), shellQuote(bare), shellQuote(bare)))
+`, host, port, shellQuote(sshConfigPathLog), shellQuote(sshConfigCopy), host, shellQuote(bare), shellQuote(bare)))
 
 	outFile := filepath.Join(t.TempDir(), "outputs")
-	_, stderr, code := run(t, runOpts{
-		dir: repo,
-		env: map[string]string{
-			"PATH":                             fakeBin + string(os.PathListSeparator) + suitePATH(),
-			"GITHUB_ACTIONS":                   "true",
-			"GITHUB_OUTPUT":                    outFile,
-			"SSH_SIGNING_KEY":                  readFile(t, signKey),
-			"GIT_USER_NAME":                    "Suite Release Bot",
-			"GIT_USER_EMAIL":                   "release-bot@test.example",
-			"RELEASE_GIT_URL":                  "ssh://git@fakehost.test:2223/itq/example.git",
-			"RELEASE_GIT_HOST_KEY_FINGERPRINT": fingerprint,
-		},
-	}, "version", "commit-changelog-release",
+	env := map[string]string{
+		"PATH":                             fakeBin + string(os.PathListSeparator) + suitePATH(),
+		"GITHUB_ACTIONS":                   "true",
+		"GITHUB_OUTPUT":                    outFile,
+		"SSH_SIGNING_KEY":                  readFile(t, signKey),
+		"GIT_USER_NAME":                    "Suite Release Bot",
+		"GIT_USER_EMAIL":                   "release-bot@test.example",
+		"RELEASE_GIT_URL":                  gitURL,
+		"RELEASE_GIT_HOST_KEY_FINGERPRINT": fingerprint,
+	}
+	initial := gitAt(t, repo, "rev-parse", "HEAD")
+	wrongPin := strings.Fields(outputOrFatal(t, toolCommand(t, "", nil, "ssh-keygen", "-lf", signKey+".pub")))[1]
+	env["RELEASE_GIT_HOST_KEY_FINGERPRINT"] = wrongPin
+	_, stderr, code := run(t, runOpts{dir: repo, env: env}, "version", "commit-changelog-release",
+		"--tag", "v3.0.0", "--repository", "itq/example")
+	if code != exitValidation || !strings.Contains(stderr, "fingerprint mismatch") {
+		t.Fatalf("wrong host pin exit=%d, want fingerprint refusal: %s", code, stderr)
+	}
+	if fileExists(sshConfigPathLog) || gitAt(t, repo, "rev-parse", "HEAD") != initial {
+		t.Fatal("wrong host pin reached the Git transport or changed the source")
+	}
+	env["RELEASE_GIT_HOST_KEY_FINGERPRINT"] = fingerprint
+	_, stderr, code = run(t, runOpts{dir: repo, env: env}, "version", "commit-changelog-release",
 		"--tag", "v3.0.0", "--repository", "itq/example")
 	if code != 0 {
 		t.Fatalf("commit-changelog-release exit %d\nstderr: %s", code, stderr)
 	}
 
 	head := gitAt(t, repo, "rev-parse", "HEAD")
-	if got := gitAt(t, repo, "remote", "get-url", "origin"); got != "ssh://git@fakehost.test:2223/itq/example.git" {
+	if got := gitAt(t, repo, "remote", "get-url", "origin"); got != gitURL {
 		t.Errorf("origin URL = %q, want exact validated SSH URL", got)
 	}
 
@@ -421,8 +508,8 @@ esac
 	gitAt(t, repo, "-c", "gpg.format=ssh", "-c", "gpg.ssh.allowedSignersFile="+signers, "tag", "-v", "v3.0.0")
 
 	sshConfig := readFile(t, sshConfigCopy)
-	assertContains(t, "SSH config hostname", sshConfig, "  HostName fakehost.test\n")
-	assertContains(t, "SSH config port", sshConfig, "  Port 2223\n")
+	assertContains(t, "SSH config hostname", sshConfig, "  HostName "+host+"\n")
+	assertContains(t, "SSH config port", sshConfig, "  Port "+port+"\n")
 	sshConfigPath := strings.TrimSpace(readFile(t, sshConfigPathLog))
 	if !filepath.IsAbs(sshConfigPath) {
 		t.Fatalf("fake ssh logged no absolute config path: %q", sshConfigPath)

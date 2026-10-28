@@ -11,9 +11,9 @@ toolchains (`syft`, `cyclonedx-gomod`, `cargo-cyclonedx`, `gpg`,
 ## The compatibility workflow
 
 The pipeline in `.github/workflows/integration.yml` is strict compatibility
-evidence for the Forge CI 0.90.0 baseline. Its default parent ref is mutable on
-purpose so drift is found quickly; every run records the exact commit it
-resolved. It is not the immutable release gate.
+evidence for the selected Forge CI source contract. Its default parent ref
+is mutable on purpose so drift is found quickly; every run records the
+exact commit it resolved. It is not the immutable release gate.
 
 | Trigger | forge-ci ref tested | Purpose |
 |---|---|---|
@@ -28,6 +28,13 @@ Nothing depends on either repository's default branch, so a fork can point its
 suite at any repository and branch by setting the two variables. After
 `v0.90.0` ships, move floating compatibility to released tags; immutable
 promotion remains an explicit commit-SHA operation.
+
+Review the engine and companion revisions together when a command contract
+changes. The current suite uses `--release-policy` and exercises in-process SSH
+host-key inspection. To test a PR candidate explicitly, build that exact checkout
+and set `FORGE_CI_TEST_BINARY` to the absolute path of the resulting executable.
+That override takes precedence over building the suite's sibling checkout; it
+must identify the candidate under review, not an older release binary.
 
 The repository override is one `owner/name` boundary with canonical default
 `diggsweden/forge-ci`; the workflow does not expose independently composable

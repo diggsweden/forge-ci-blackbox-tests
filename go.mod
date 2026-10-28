@@ -2,7 +2,10 @@ module github.com/diggsweden/forge-ci-blackbox-tests
 
 go 1.27.2
 
-require github.com/google/go-containerregistry v0.21.6
+require (
+	github.com/google/go-containerregistry v0.21.6
+	golang.org/x/crypto v0.58.0
+)
 
 require (
 	github.com/docker/cli v29.4.3+incompatible // indirect
@@ -12,6 +15,6 @@ require (
 	github.com/opencontainers/image-spec v1.1.1 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 	gotest.tools/v3 v3.5.2 // indirect
 )
