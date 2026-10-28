@@ -289,6 +289,7 @@ func TestContainerImage_ReproducibleImageID(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("buildah OCI export exit %d", code)
 		}
+
 		return reproducibleOCIManifest(t, layout)
 	}
 	if firstManifest, secondManifest := export("repro-test-a:1"), export("repro-test-b:1"); firstManifest != secondManifest {
@@ -366,6 +367,7 @@ func reproducibleOCIManifest(t *testing.T, layout string) string {
 		if readErr != nil {
 			t.Fatal(readErr)
 		}
+
 		return data
 	}
 	var manifest struct {
@@ -382,6 +384,7 @@ func reproducibleOCIManifest(t *testing.T, layout string) string {
 	for _, layer := range manifest.Layers {
 		readBlob(layer)
 	}
+
 	return index.Manifests[0].Digest
 }
 

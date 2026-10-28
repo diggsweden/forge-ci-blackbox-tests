@@ -60,9 +60,23 @@ type releaseImagesFixture struct {
 func seedReleaseImages(t *testing.T, tag string) releaseImagesFixture {
 	t.Helper()
 
+	return seedReleaseImagesWithAPI(t, tag, nil)
+}
+
+func seedReleaseImagesWithAPI(t *testing.T, tag string, packageAPI http.Handler) releaseImagesFixture {
+	t.Helper()
+
 	ctx := t.Context()
 
-	srv := httptest.NewServer(registry.New())
+	images := registry.New()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if packageAPI != nil && strings.HasPrefix(r.URL.Path, "/api/v1/") {
+			packageAPI.ServeHTTP(w, r)
+
+			return
+		}
+		images.ServeHTTP(w, r)
+	}))
 	t.Cleanup(srv.Close)
 
 	host := srv.Listener.Addr().String()
@@ -337,13 +351,8 @@ func TestReleaseImagesRollback_RequiresAProviderToken(t *testing.T) {
 func TestReleaseImagesRollback_AuthenticatesPackageAPI(t *testing.T) {
 	t.Parallel()
 
-	fix := seedReleaseImages(t, "v1.2.3")
-	if _, stderr, code := runReleaseImages(t, fix, "v1.2.3", fix.image, "promote"); code != 0 {
-		t.Fatalf("release-images promote exit=%d stderr=%s", code, stderr)
-	}
-
 	requests := make(chan string, 2)
-	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	fix := seedReleaseImagesWithAPI(t, "v1.2.3", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		select {
 		case requests <- r.Method + " " + r.URL.Path + " | " + r.Header.Get("Authorization"):
 		default:
@@ -352,7 +361,9 @@ func TestReleaseImagesRollback_AuthenticatesPackageAPI(t *testing.T) {
 
 		http.Error(w, "fixture denies deletion", http.StatusForbidden)
 	}))
-	t.Cleanup(api.Close)
+	if _, stderr, code := runReleaseImages(t, fix, "v1.2.3", fix.image, "promote"); code != 0 {
+		t.Fatalf("release-images promote exit=%d stderr=%s", code, stderr)
+	}
 
 	stdout, stderr, code := run(t, runOpts{env: map[string]string{
 		"FORGE_CI_PROVIDER":          "forgejo",
@@ -364,7 +375,7 @@ func TestReleaseImagesRollback_AuthenticatesPackageAPI(t *testing.T) {
 		"--dist-dir", fix.distDir, "--ledger", fix.ledger, "--journal", fix.journal,
 		"--tag", "v1.2.3", "--stage", "release", "--registry", fix.host,
 		"--registry-username", "tester", "--expected-image-repository", fix.image,
-		"--server-url", api.URL, "--repository", "fixture/demo",
+		"--server-url", "http://"+fix.host, "--repository", "fixture/demo",
 	)
 	if code != exitNoPerm {
 		t.Fatalf("rollback with a refusing package API: exit=%d, want %d; stderr=%s", code, exitNoPerm, stderr)
@@ -384,6 +395,40 @@ func TestReleaseImagesRollback_AuthenticatesPackageAPI(t *testing.T) {
 		if strings.Contains(stdout+stderr, token) {
 			t.Error("rollback exposed a credential in its output")
 		}
+	}
+}
+
+func TestReleaseImagesRollbackRefusesForeignPackageAPI(t *testing.T) {
+	t.Parallel()
+	fix := seedReleaseImages(t, "v1.2.3")
+	if _, stderr, code := runReleaseImages(t, fix, "v1.2.3", fix.image, "promote"); code != 0 {
+		t.Fatalf("promote exit=%d: %s", code, stderr)
+	}
+	requests := make(chan struct{}, 1)
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		select {
+		case requests <- struct{}{}:
+		default:
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(api.Close)
+	_, stderr, code := run(t, runOpts{env: map[string]string{
+		"FORGE_CI_PROVIDER": "forgejo", "FORGE_CI_PACKAGE_API_TOKEN": "package-api-fixture", "REGISTRY_TOKEN": "registry-fixture",
+	}}, "container", "release-images", "rollback", "--dist-dir", fix.distDir,
+		"--ledger", fix.ledger, "--journal", fix.journal, "--tag", "v1.2.3", "--stage", "release",
+		"--registry", fix.host, "--registry-username", "tester", "--expected-image-repository", fix.image,
+		"--server-url", api.URL, "--repository", "fixture/demo")
+	if code != exitUsage || !strings.Contains(stderr, "the image is not in the registry") {
+		t.Fatalf("foreign package API exit=%d, want authority refusal: %s", code, stderr)
+	}
+	select {
+	case <-requests:
+		t.Fatal("foreign package API received deletion authority")
+	default:
+	}
+	if got, err := crane.Digest(fix.image+":stable", crane.Insecure, crane.WithContext(t.Context())); err != nil || got != fix.digest {
+		t.Fatalf("foreign API refusal changed the promoted image: %q: %v", got, err)
 	}
 }
 
