@@ -90,12 +90,14 @@ func TestExitCodes_Matrix(t *testing.T) {
 			want:    2,
 			wantErr: `"ledger" requires a subcommand`,
 		},
-		// The root is the deliberate exemption: `forge-ci` alone is the
-		// discovery path and still renders help at exit 0.
+		// The root is no exemption: `forge-ci` alone prints a short start card
+		// on stderr and refuses with a usage error, like a bare group. --help
+		// and `help` remain the exit-0 requests for the reference (CLI-02).
 		{
-			name: "bare_root_still_renders_help",
-			args: []string{},
-			want: 0,
+			name:    "bare_root_is_EX_USAGE_with_a_start_card",
+			args:    []string{},
+			want:    2,
+			wantErr: "START HERE",
 		},
 	}
 

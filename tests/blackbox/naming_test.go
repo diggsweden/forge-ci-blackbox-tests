@@ -94,6 +94,13 @@ func TestNaming_TopLevelGroupsHaveCoverageDisposition(t *testing.T) {
 			continue
 		}
 
+		// Category headers ("   Repository setup and troubleshooting:") sit
+		// inside the block since the root help was grouped; they end in a
+		// colon and name no command.
+		if strings.HasSuffix(strings.TrimSpace(line), ":") {
+			continue
+		}
+
 		fields := strings.Fields(line)
 		if len(fields) < 2 || fields[0] == "help," {
 			continue
