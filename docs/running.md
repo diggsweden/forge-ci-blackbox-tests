@@ -14,42 +14,6 @@ Custom launchers must use `FORGE_CI_TEST_BINARY` instead of the former
 caller. The suite checks the binary's public name before treating it as Forge
 CI evidence.
 
-## Forks and fixture identities
-
-The suite's repository name and the engine's repository name are independent.
-For the compatibility workflow, set `FORGE_CI_REPOSITORY` to your engine's
-`owner/repository` and `FORGE_CI_REF` to its default branch or desired revision.
-Manual workflow inputs override those defaults. Keep the parent engine
-workflow's companion commit pin explicit; a moving drift target and an
-immutable release-gate pin serve different purposes.
-
-The workflow records a full resolved SHA-1 or SHA-256 commit ID. A hosting
-migration must establish the destination object format and commit IDs;
-shortening a SHA-256 ID or assuming push converts history is not a substitute.
-Port the provider-specific checkout/runner configuration when moving the
-workflow between GitHub and Forgejo; changing the repository variable alone
-does not change the forge hosting the workflow.
-
-The strict-profile contract check reads `.forgejo/workflows/integration.yml`
-when the Forgejo workflow directory exists, otherwise the GitHub file. It
-checks the repository/ref override contract without requiring the original
-organization's fallback values. A missing active workflow is an error, even
-if an inactive GitHub copy remains.
-
-Locally, clone the chosen engine into the sibling directory named `forge-ci`,
-regardless of its remote repository name, or build that checkout yourself and
-set `FORGE_CI_TEST_BINARY` to the resulting executable. This avoids adding
-another source-selection mechanism beside the existing binary override.
-
-Synthetic fixture coordinates use `fixture/integration`, `@fixture/npm-app`,
-`@fixture/npm-lib`, and the JVM groups `org.example.test` or
-`org.example.fixture`. They are test identities, not real publication accounts.
-Use reserved example domains for new inert URLs and loopback test servers for
-actual registry/API calls. Keep manifests, lockfiles, expected archive names,
-SBOM paths and simulated API paths consistent when changing a fixture identity.
-Preserve upstream provenance identifiers and source/license attribution where
-they identify the real project rather than synthetic test data.
-
 ## Requirements
 
 - Go 1.27.2 or newer, to run `go test`.
@@ -88,6 +52,42 @@ a build is broken evidence, not missing evidence: the container-first flow
 fails in every profile. The container jobs select
 the native CPU architecture explicitly: AMD64 runs on AMD64 hosts, ARM64 on
 ARM64 hosts. Do not enable cross-architecture emulation to satisfy this lane.
+
+## Forks and fixture identities
+
+The suite's repository name and the engine's repository name are independent.
+For the compatibility workflow, set `FORGE_CI_REPOSITORY` to your engine's
+`owner/repository` and `FORGE_CI_REF` to its default branch or desired revision.
+Manual workflow inputs override those defaults. Keep the parent engine
+workflow's companion commit pin explicit; a moving drift target and an
+immutable release-gate pin serve different purposes.
+
+The workflow records a full resolved SHA-1 or SHA-256 commit ID. A hosting
+migration must establish the destination object format and commit IDs;
+shortening a SHA-256 ID or assuming push converts history is not a substitute.
+Port the provider-specific checkout/runner configuration when moving the
+workflow between GitHub and Forgejo; changing the repository variable alone
+does not change the forge hosting the workflow.
+
+The strict-profile contract check reads `.forgejo/workflows/integration.yml`
+when the Forgejo workflow directory exists, otherwise the GitHub file. It
+checks the repository/ref override contract without requiring the original
+organization's fallback values. A missing active workflow is an error, even
+if an inactive GitHub copy remains.
+
+Locally, clone the chosen engine into the sibling directory named `forge-ci`,
+regardless of its remote repository name, or build that checkout yourself and
+set `FORGE_CI_TEST_BINARY` to the resulting executable. This avoids adding
+another source-selection mechanism beside the existing binary override.
+
+Synthetic fixture coordinates use `fixture/integration`, `@fixture/npm-app`,
+`@fixture/npm-lib`, and the JVM groups `org.example.test` or
+`org.example.fixture`. They are test identities, not real publication accounts.
+Use reserved example domains for new inert URLs and loopback test servers for
+actual registry/API calls. Keep manifests, lockfiles, expected archive names,
+SBOM paths and simulated API paths consistent when changing a fixture identity.
+Preserve upstream provenance identifiers and source/license attribution where
+they identify the real project rather than synthetic test data.
 
 ## Commands
 

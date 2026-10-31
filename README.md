@@ -12,6 +12,10 @@ signatures you can verify with `sha256sum --check` or `gpg --verify`.
   output, and a developer's own settings leaking into a result.
 - Leaves your home directory, Git config, keys and credentials alone.
 
+This suite is for people changing Forge CI. To adopt Forge CI in your own
+project you need only [forge-ci](https://github.com/diggsweden/forge-ci) and
+its `init` and `doctor` commands, not this repository.
+
 ## Quick Start
 
 Check out this repository next to `forge-ci`; the suite builds the engine from

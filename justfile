@@ -41,7 +41,7 @@ pkg := "./tests/blackbox/"
 
 [private]
 default:
-    @printf '{{ CYAN_BOLD }} Forge CI black-box testsuite recipes{{ NC }}\n\n Quick start: {{ BLUE }}mise trust{{ NC }} · {{ MAGENTA }}just install-dev-tools{{ NC }} · {{ GREEN }}just test{{ NC }}\n ▪ main job of its group\n\n'
+    @printf '{{ CYAN_BOLD }} Forge CI black-box testsuite recipes{{ NC }}\n\n Quick start: {{ BLUE }}mise trust{{ NC }} · {{ MAGENTA }}just install-dev-tools{{ NC }} · {{ GREEN }}just test{{ NC }}\n Needs the engine: a ../forge-ci checkout, or FORGE_CI_TEST_BINARY=/path/to/forge-ci\n First run: downloads toolchains and base images, and may start containers\n NOT PROVEN = a test skipped for a missing tool; just test-strict fails it instead\n ▪ main job of its group\n\n'
     @"{{ just_executable() }}" --justfile "{{ justfile() }}" --list --unsorted --list-heading ''
 
 # ==================================================================================== #
