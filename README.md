@@ -78,7 +78,6 @@ macOS release targets; WSL is best effort.
 
 - **[Development](docs/development.md)** • Adding a test, the helpers, and lint
 - **[Layout](docs/layout.md)** • The repository layout and where a test goes
-- **[Open work](TEST_AUDIT_BACKLOG.md)** • Known findings waiting for a fix
 - **[Issues](https://github.com/diggsweden/forge-ci-blackbox-tests/issues)** •
   Report bugs or request coverage
 
