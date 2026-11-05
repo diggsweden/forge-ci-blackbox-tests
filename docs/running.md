@@ -5,20 +5,21 @@
 
 ## The engine under test
 
-This suite is the independent companion for the Forge CI 0.90.0 baseline. The
-default engine is the sibling `../forge-ci` checkout, which the suite builds
-itself. `FORGE_CI_TEST_BINARY` selects an explicit binary instead.
+This independent black-box suite tests the Forge CI executable. Set
+`FORGE_CI_TEST_BINARY` to the binary under test; no engine source checkout is
+required. As a development convenience, when the variable is unset the suite
+builds the adjacent `../forge-ci` checkout.
 
 Custom launchers must use `FORGE_CI_TEST_BINARY` instead of the former
-`FORGE_CI` override, and update their immutable companion pin together with the
+`FORGE_CI` override, and review their immutable suite pin together with the
 caller. The suite checks the binary's public name before treating it as Forge
 CI evidence.
 
 ## Requirements
 
 - Go 1.27.2 or newer, to run `go test`.
-- A checkout of the chosen Forge CI engine as the sibling `forge-ci` directory,
-  or `FORGE_CI_TEST_BINARY` pointing at a pre-built binary.
+- `FORGE_CI_TEST_BINARY` pointing at a pre-built engine binary, or a checkout
+  of the chosen engine in the adjacent `forge-ci` directory.
 - Optional for the default developer profile: `mvn`, `npm`, `cargo`,
   `buildah`, `gpg`/`gpgconf`, `syft`, `cyclonedx-gomod`, `cargo-cyclonedx`, and
   the JDK (`java` and `javac`), Git, Cosign, Bash, `sha256sum`, `ssh-keygen`
@@ -58,8 +59,8 @@ ARM64 hosts. Do not enable cross-architecture emulation to satisfy this lane.
 The suite's repository name and the engine's repository name are independent.
 For the compatibility workflow, set `FORGE_CI_REPOSITORY` to your engine's
 `owner/repository` and `FORGE_CI_REF` to its default branch or desired revision.
-Manual workflow inputs override those defaults. Keep the parent engine
-workflow's companion commit pin explicit; a moving drift target and an
+Manual workflow inputs override those defaults. Keep the engine compatibility
+workflow's suite commit pin explicit; a moving drift target and an
 immutable release-gate pin serve different purposes.
 
 The workflow records a full resolved SHA-1 or SHA-256 commit ID. A hosting
@@ -75,10 +76,9 @@ checks the repository/ref override contract without requiring the original
 organization's fallback values. A missing active workflow is an error, even
 if an inactive GitHub copy remains.
 
-Locally, clone the chosen engine into the sibling directory named `forge-ci`,
-regardless of its remote repository name, or build that checkout yourself and
-set `FORGE_CI_TEST_BINARY` to the resulting executable. This avoids adding
-another source-selection mechanism beside the existing binary override.
+Locally, set `FORGE_CI_TEST_BINARY` to the chosen executable. To use the optional
+automatic build instead, clone the engine into the adjacent directory named
+`forge-ci`, regardless of its remote repository name.
 
 Synthetic fixture coordinates use `fixture/integration`, `@fixture/npm-app`,
 `@fixture/npm-lib`, and the JVM groups `org.example.test` or

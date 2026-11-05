@@ -18,19 +18,23 @@ its `init` and `doctor` commands, not this repository.
 
 ## Quick Start
 
-Check out this repository next to `forge-ci`; the suite builds the engine from
-`../forge-ci`:
+Select the engine executable with `FORGE_CI_TEST_BINARY`. The suite does not
+require an engine source checkout when testing an explicit binary.
 
 Install and activate [mise](https://mise.jdx.dev/getting-started.html) first.
 
 ```bash
-git clone https://github.com/diggsweden/forge-ci.git
 git clone https://github.com/diggsweden/forge-ci-blackbox-tests.git
 cd forge-ci-blackbox-tests
 mise trust
 mise install just
 mise exec -- just install-dev-tools
+export FORGE_CI_TEST_BINARY=/absolute/path/to/forge-ci
 ```
+
+For source development, you can instead clone the chosen engine into the
+adjacent `../forge-ci` directory and leave `FORGE_CI_TEST_BINARY` unset. The
+suite builds that checkout automatically.
 
 Then run the suite:
 
@@ -44,7 +48,7 @@ just test-strict
 # One test, or a pattern
 just test-run TestFlow_ContainerFirst_Go
 
-# A binary you built yourself instead of ../forge-ci
+# Select a different engine binary for one run
 just test-binary /path/to/forge-ci
 ```
 

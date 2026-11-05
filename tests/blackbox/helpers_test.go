@@ -261,7 +261,7 @@ func isolatedEnv(extra map[string]string) []string {
 		// The caller's explicit /proc/swaps fixture wins. Otherwise use a
 		// no-swap fixture so signing tests on developer hosts with swap are
 		// not blocked. This redirection is test-only; forge-ci's production
-		// workflows do not set it, while this companion's strict workflow uses
+		// workflows do not set it, while this suite's strict workflow uses
 		// /dev/null.
 		"FORGE_CI_PROC_SWAPS": procSwaps,
 		// Containment: cosign uploads every signature to the PUBLIC Rekor

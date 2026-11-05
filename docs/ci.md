@@ -29,7 +29,7 @@ suite at any repository and branch by setting the two variables. After
 `v0.90.0` ships, move floating compatibility to released tags; immutable
 promotion remains an explicit commit-SHA operation.
 
-Review the engine and companion revisions together when a command contract
+Review the engine and test-suite revisions together when a command contract
 changes. The current suite uses `--release-policy` and exercises in-process SSH
 host-key inspection. To test a PR candidate explicitly, build that exact checkout
 and set `FORGE_CI_TEST_BINARY` to the absolute path of the resulting executable.

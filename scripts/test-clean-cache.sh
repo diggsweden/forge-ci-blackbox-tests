@@ -101,4 +101,4 @@ if [[ $OSTYPE == darwin* ]]; then
 	TMPDIR="$work/base" HOME="$work/base" bash "$root/scripts/clean-cache.sh" >"$work/log" 2>&1 || status=$?
 	[[ $status == 2 && $(<"$work/log") == *'group- or world-writable'* && ! -e "$cache/forge-ci-blackbox.lock" ]]
 fi
-printf 'Companion cache cleanup contracts passed.\n'
+printf 'Test-suite cache cleanup contracts passed.\n'

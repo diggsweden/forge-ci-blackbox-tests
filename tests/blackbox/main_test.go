@@ -152,8 +152,7 @@ func runSuite(m *testing.M) (code int) {
 		}
 	}()
 
-	// Resolve sibling forge-ci checkout. The testsuite lives at
-	// .../forge-ci-blackbox-tests/, so the binary source is at ../forge-ci/.
+	// Resolve the suite's own root independently of the engine location.
 	_, here, _, _ := runtime.Caller(0) //nolint:dogsled // Caller returns (pc, file, line, ok); we need only file.
 	suiteDir = filepath.Clean(filepath.Join(filepath.Dir(here), "..", ".."))
 
@@ -163,7 +162,7 @@ func runSuite(m *testing.M) (code int) {
 		return 2
 	}
 
-	// An explicit FORGE_CI_TEST_BINARY override ALWAYS wins over the sibling
+	// An explicit FORGE_CI_TEST_BINARY override ALWAYS wins over the adjacent
 	// checkout: compatibility gates point it at the exact candidate binary,
 	// and testing a fresh self-build instead would
 	// silently validate the wrong artifact.

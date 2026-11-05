@@ -20,9 +20,9 @@ trap 'rm -rf "$tmp"' EXIT
 export TMPDIR="$tmp"
 
 # The compatibility workflow runs this before the suite; forge-ci's
-# workflows ran it at their pinned companion commit. Keep the companion's
-# repository/ref overrides available while the parent workflows retain their
-# immutable companion pin. A fork may change the literal fallback coordinates
+# workflows ran it at their pinned suite commit. Keep the suite's
+# repository/ref overrides available while the engine workflows retain their
+# immutable suite pin. A fork may change the literal fallback coordinates
 # without changing this contract check.
 # Forgejo gives its workflow directory precedence when both provider layers
 # are retained. Check the active compatibility file, not the inert GitHub copy.
@@ -45,7 +45,7 @@ for expected in \
 		exit 1
 	fi
 done
-printf 'blackbox contract: companion drift target supports repository/ref overrides\n'
+printf 'blackbox contract: suite drift target supports repository/ref overrides\n'
 
 (
 	cd "$root"

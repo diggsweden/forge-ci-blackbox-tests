@@ -17,7 +17,7 @@
 # The default target is the FORGE_CI_REPOSITORY / FORGE_CI_REF repository
 # variables, falling back to diggsweden/forge-ci at main, so a fork can
 # test any repository and branch without relying on a default branch. Each run records the exact
-# resolved commit; forge-ci's own gates separately pin this companion by SHA.
+# resolved commit; forge-ci's compatibility gates pin this suite by SHA.
 name: Strict Forge CI Compatibility
 on: # yamllint disable-line rule:truthy
   workflow_dispatch:
