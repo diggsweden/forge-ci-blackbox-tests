@@ -223,8 +223,8 @@ jobs:
         run: |
           set -euo pipefail
           command -v mise >/dev/null
-          mise install maven@3.9.16
-          mise bin-paths maven@3.9.16 >>"$GITHUB_PATH"
+          mise install maven@3.10.0
+          mise bin-paths maven@3.10.0 >>"$GITHUB_PATH"
 
       - name: Install floor-checked distro Buildah
         timeout-minutes: 7
@@ -253,7 +253,7 @@ jobs:
         timeout-minutes: 4
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
         with:
-          cosign-release: "v3.1.3"
+          cosign-release: "v3.1.4"
 
       # Cache only public inputs whose ecosystems verify content against
       # go.sum/Cargo.lock. Keep Maven/Gradle/npm, Buildah storage, Sigstore

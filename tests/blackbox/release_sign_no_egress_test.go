@@ -6,12 +6,11 @@
 // Containment, second half: a signing run configured to publish nothing must
 // make no cosign HTTP(S) attempt observable through the configured proxies.
 //
-// The two are not the same, and the gap is easy to miss. A signing config with
-// no transparency-log service stops the Rekor upload — but cosign verifies each
-// signature it has just written, and fetches the trust root from
-// tuf-repo-cdn.sigstore.dev to do it, once per signature. So "we don't publish"
-// left the suite still announcing itself to Sigstore on every signing test.
-// --trusted-root closes that.
+// Disabling transparency-log publication does not itself prevent trust-root
+// downloads. Cosign versions differ in whether private-key signing needs that
+// root; the engine supplies local trust material and these tests observe signing
+// itself. The control explicitly initializes TUF, rather than relying on a
+// signing operation to fetch it as a side effect.
 //
 // The proxy below enforces that observable boundary and names the attempted
 // HTTP(S) authority. It does not observe other protocols or clients that bypass
@@ -193,9 +192,9 @@ func TestReleaseSign_EnvKeyMakesNoProxyObservableHTTPAttempt(t *testing.T) {
 // reason the test above can be believed: it proves the proxy actually sees what
 // it claims to, by making cosign do the very fetch the engine suppresses.
 //
-// It drives cosign directly with a signing config but NO trusted root — the
-// engine's behaviour before --trusted-root was added. cosign then fetches the
-// trust root, the proxy records the attempt and drops it.
+// It explicitly initializes Cosign's TUF client with an empty cache. Signing
+// without --trusted-root is not a reliable control: newer Cosign can sign with
+// a private key without fetching any trust material.
 //
 // This is safe to run, which is why it exists where a "does it catch a Rekor
 // upload?" control cannot: the suppressed call is a READ of public trust
@@ -207,38 +206,24 @@ func TestEgressRecorder_CatchesTheTrustRootFetch(t *testing.T) {
 	requireTool(t, "cosign")
 
 	proxy, recorded := recordEgress(t)
-	dir, key := signBlobFixture(t)
-
-	// The engine's own no-transparency-log signing config, inline: this test
-	// asserts what happens WITHOUT the matching trusted root, so it cannot go
-	// through the engine (which now always pairs them).
-	config := filepath.Join(dir, "signing-config.json")
-	if err := os.WriteFile(config, []byte(
-		`{"mediaType":"application/vnd.dev.sigstore.signingconfig.v0.2+json",`+
-			`"rekorTlogConfig":{},"tsaConfig":{}}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	dir := t.TempDir()
 
 	env := proxyEnv(proxy)
-	env["COSIGN_PASSWORD"] = ""
-	env["SIGSTORE_ROOT_FILE"] = "" // This is the no-trusted-root negative control.
+	env["SIGSTORE_ROOT_FILE"] = ""
+	// A previous signing test must not satisfy the control from its TUF cache.
+	env["HOME"] = dir
+	env["XDG_CACHE_HOME"] = filepath.Join(dir, "cache")
 
-	cmd := toolCommand(t, dir, env, "cosign", "sign-blob", "--yes",
-		"--key", key,
-		"--signing-config", config,
-		"--bundle", filepath.Join(dir, "probe.bundle"),
-		filepath.Join(dir, "release-artifacts", "app.tgz"))
+	cmd := toolCommand(t, dir, env, "cosign", "initialize", "--mirror", "https://tuf-repo-cdn.sigstore.dev")
 
-	_ = cmd.Run() // may fail once the proxy drops the fetch; the attempt is the point
+	output, err := cmd.CombinedOutput() // The proxy deliberately drops the fetch.
 
 	hits := recorded()
 	if len(hits) == 0 {
-		t.Fatal("the egress recorder saw nothing when cosign was made to fetch its trust root. " +
-			"Either cosign stopped honouring $HTTPS_PROXY or the recorder is broken — " +
-			"either way TestReleaseSign_MakesNoProxyObservableHTTPAttempt is now passing vacuously.")
+		t.Fatalf("no trust-root fetch recorded; the egress control did not establish interception: err=%v\n%s", err, output)
 	}
 
-	if !strings.Contains(strings.Join(hits, " "), "sigstore.dev") {
-		t.Errorf("expected the recorded attempt to name a sigstore.dev host, got: %v", hits)
+	if !strings.Contains(strings.Join(hits, " "), "tuf-repo-cdn.sigstore.dev") {
+		t.Errorf("expected the recorded attempt to name the configured TUF host, got: %v", hits)
 	}
 }

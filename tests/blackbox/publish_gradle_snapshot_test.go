@@ -20,7 +20,7 @@ import (
 
 func TestMavenSnapshotTransportRefusesRedirectsAndReplay(t *testing.T) {
 	requireTool(t, "mvn")
-	for _, status := range []int{http.StatusTemporaryRedirect, http.StatusServiceUnavailable} {
+	for _, status := range []int{http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect, http.StatusServiceUnavailable} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			root := t.TempDir()
 			publication := filepath.Join(root, "org/example/fixture/pom/1.0.0-SNAPSHOT")
@@ -31,11 +31,18 @@ func TestMavenSnapshotTransportRefusesRedirectsAndReplay(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(publication, "pom-1.0.0-SNAPSHOT.pom"), []byte(pom), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			var redirected, puts atomic.Int64
-			other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { redirected.Add(1); w.WriteHeader(http.StatusOK) }))
+			var requested, redirected, credentials, puts atomic.Int64
+			other := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+				redirected.Add(1)
+				if request.Header.Get("Authorization") != "" {
+					credentials.Add(1)
+				}
+				w.WriteHeader(http.StatusOK)
+			}))
 			defer other.Close()
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-				if status == http.StatusTemporaryRedirect {
+				requested.Add(1)
+				if status != http.StatusServiceUnavailable {
 					w.Header().Set("Location", other.URL)
 					w.WriteHeader(status)
 
@@ -58,8 +65,14 @@ func TestMavenSnapshotTransportRefusesRedirectsAndReplay(t *testing.T) {
 			if strings.Contains(stderr, "synthetic-snapshot-token") {
 				t.Fatal("credential leaked in diagnostics")
 			}
+			if requested.Load() == 0 {
+				t.Fatalf("Maven failed before reaching the repository; transport behavior was not exercised:\n%s", stderr)
+			}
+			if credentials.Load() != 0 {
+				t.Error("Maven sent credentials to the redirect target")
+			}
 			if redirected.Load() != 0 {
-				t.Fatal("Maven followed a credential-bearing repository redirect")
+				t.Error("Maven followed a repository redirect")
 			}
 			if status == http.StatusServiceUnavailable && puts.Load() != 1 {
 				t.Fatalf("failed PUT attempts = %d, want one", puts.Load())
