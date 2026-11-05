@@ -30,7 +30,7 @@ func TestBuildType_MavenApplication(t *testing.T) {
 	proj := copyTree(t, fixture("maven-hello"))
 
 	_, stderr, code := run(t, runOpts{dir: proj},
-		"build", "maven", "run", "--build-type", "app", "--cli-opts", "-B -ntp", "--skip-tests", "--build-sbom=false")
+		"build", "maven", "run", "--build-type", "app", "--cli-opts", "-B -ntp", "--build-sbom=false")
 	if code != 0 {
 		t.Fatalf("build maven application exit %d\nstderr: %s", code, stderr)
 	}
@@ -59,7 +59,7 @@ func TestBuildType_MavenLibrary(t *testing.T) {
 	proj := copyTree(t, fixture("maven-lib"))
 
 	_, stderr, code := run(t, runOpts{dir: proj},
-		"build", "maven", "run", "--build-type", "lib", "--cli-opts", "-B -ntp", "--skip-tests", "--build-sbom=false")
+		"build", "maven", "run", "--build-type", "lib", "--cli-opts", "-B -ntp", "--build-sbom=false")
 	if code != 0 {
 		t.Fatalf("build maven library exit %d\nstderr: %s", code, stderr)
 	}
@@ -155,7 +155,7 @@ func TestBuildType_GradleApplication(t *testing.T) {
 	proj := copyTree(t, fixture("gradle-hello"))
 
 	_, stderr, code := run(t, runOpts{dir: proj},
-		"build", "gradle", "run", "--tasks", "build", "--skip-tests", "--build-sbom=false")
+		"build", "gradle", "run", "--tasks", "build", "--build-sbom=false")
 	if code != 0 {
 		t.Fatalf("build gradle application exit %d\nstderr: %s", code, stderr)
 	}
@@ -187,7 +187,7 @@ func TestBuildType_GradleLibraryTasks(t *testing.T) {
 	_, stderr, code := run(t, runOpts{dir: proj},
 		"build", "gradle", "run",
 		"--tasks", "jar sourcesJar javadocJar",
-		"--skip-tests", "--build-sbom=false",
+		"--build-sbom=false",
 	)
 	if code != 0 {
 		t.Fatalf("build gradle application (lib tasks) exit %d\nstderr: %s", code, stderr)

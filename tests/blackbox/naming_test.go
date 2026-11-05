@@ -33,6 +33,7 @@ func commandGroupCoverage() map[string]commandGroupDisposition {
 		"lint":      {covered: false, reason: "Swift lint wrappers require a macOS toolchain"},
 		"plan":      {covered: true, reason: "version_snapshot_test.go"},
 		"platform":  {covered: true, reason: "platform_checkout_test.go"},
+		"policy":    {covered: true, reason: "policy_test.go"},
 		"publish":   {covered: true, reason: "publish_validate_test.go"},
 		"release":   {covered: true, reason: "release_* and flow_*"},
 		"report":    {covered: true, reason: "report_test.go"},

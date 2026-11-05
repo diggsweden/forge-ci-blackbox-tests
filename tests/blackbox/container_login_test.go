@@ -70,7 +70,7 @@ func TestContainerLogin_NoFallbackForForeignRegistry(t *testing.T) {
 		"GITHUB_TOKEN":       runnerToken,
 		"GITHUB_ACTOR":       "ci-bot",
 		"REGISTRY_AUTH_FILE": authFile,
-	}}, "container", "login", "--registry", "docker.io")
+	}}, "container", "login", "--registry", "docker.io", "--registry-username", "registry-user")
 	if code == 0 {
 		t.Fatalf("login to a foreign registry with no password should fail (no token leak); got exit 0")
 	}

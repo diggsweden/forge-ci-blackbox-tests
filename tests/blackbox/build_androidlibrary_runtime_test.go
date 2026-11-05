@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Digg - Agency for Digital Government
 // SPDX-License-Identifier: EUPL-1.2 OR GPL-3.0-or-later
 
-//go:build blackbox
+//go:build blackbox && linux && amd64
 
 package blackbox
 
@@ -15,6 +15,8 @@ import (
 
 // The SDK is an immutable container input. This test installs no host SDK and
 // uses the suite's existing isolated Buildah store, not the developer's store.
+// Linux/AMD64 only: Google's Maven-provided AAPT2 is an x86-64 executable.
+// Keep this native-only; ARM64 compatibility runs exclude this test.
 func TestAndroidLibraryBuildAndExportInPinnedRuntime(t *testing.T) {
 	requireTool(t, "buildah")
 	project := copyGradleFixture(t, "android-library")

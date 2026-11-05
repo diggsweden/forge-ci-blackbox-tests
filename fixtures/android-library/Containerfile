@@ -7,7 +7,7 @@ COPY forge-ci /usr/local/bin/forge-ci
 COPY . .
 RUN --mount=type=cache,target=/root/.gradle \
     forge-ci build gradle-android run --library --build-module lib \
-      --name-override library --skip-tests --sbom-tool-version 3.2.1 \
+      --name-override library --sbom-tool-version 3.2.1 \
     && forge-ci build gradle export-publications \
       --output publication --version 1.2.3 --central \
     && forge-ci version bump --project-type gradle-android \

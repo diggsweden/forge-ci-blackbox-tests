@@ -194,7 +194,7 @@ jobs:
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5.2.0
         with:
           distribution: temurin
-          java-version: "25.0.2+10"
+          java-version: "25.0.2+10.0.LTS"
 
       - name: Set up pinned Rust
         timeout-minutes: 8
@@ -207,6 +207,15 @@ jobs:
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: "24.13.1"
+
+      - name: Set up pinned mise
+        timeout-minutes: 4
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db
+        with:
+          version: "2026.10.8"
+          install: false
+          cache: false
+          add_shims_to_path: false
 
       - name: Install pinned Maven
         timeout-minutes: 7

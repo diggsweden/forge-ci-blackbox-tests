@@ -33,7 +33,7 @@ func TestSBOMBuild_ReviewedGenerators(t *testing.T) {
 					t.Fatalf("prepare npm lockfile: exit %d: %s", code, stderr)
 				}
 			}
-			args := []string{"build", tc.ecosystem, "run", "--skip-tests", "--sbom-tool-version", tc.generator}
+			args := []string{"build", tc.ecosystem, "run", "--sbom-tool-version", tc.generator}
 			if tc.ecosystem == "maven" {
 				args = append(args, "--build-type", "app", "--cli-opts", "-B -ntp")
 			}

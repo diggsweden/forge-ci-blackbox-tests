@@ -290,7 +290,7 @@ func TestVersionBump_EdgeCaseExitCodes(t *testing.T) {
 
 		// Name the parse rule so an unrelated failure cannot satisfy the case.
 		assertContains(t, "malformed Cargo.toml", stderr,
-			"neither [package] nor [workspace.package]")
+			"parse cargo manifest:")
 	})
 
 	t.Run("leading_v_in_version_is_canonicalized", func(t *testing.T) {

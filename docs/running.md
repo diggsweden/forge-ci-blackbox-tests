@@ -127,6 +127,12 @@ support) fails instead. `TestMain`:
 Explicit Linux exclusions remain exclusions; strict mode does not turn them
 into claimed coverage.
 
+`TestAndroidLibraryBuildAndExportInPinnedRuntime` is permanently restricted by
+the `blackbox && linux && amd64` build constraint. Google's Maven-provided
+AAPT2 executable requires x86-64. ARM64 runs exclude this Android SDK runtime
+test; they do not establish Android runtime coverage. No emulation or alternate
+ARM64 AAPT2 distribution is used. The other Android CLI contract tests still run.
+
 Engine and tool scenario subprocesses have a 10-minute context deadline;
 version probes and the suite binary build have tighter limits.
 

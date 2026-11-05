@@ -50,7 +50,7 @@ func TestGradleSBOM_VersionLines(t *testing.T) {
 			}
 
 			_, stderr, code := run(t, runOpts{dir: proj, env: map[string]string{"JAVA_HOME": javaHome}},
-				"build", "gradle", "run", "--tasks", "build", "--skip-tests", "--build-sbom", "--sbom-tool-version", version,
+				"build", "gradle", "run", "--tasks", "build", "--build-sbom", "--sbom-tool-version", version,
 			)
 			if code != 0 {
 				t.Fatalf("gradle sbom v%s exit %d\nstderr:\n%s", version, code, stderr)

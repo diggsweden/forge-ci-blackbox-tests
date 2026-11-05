@@ -68,8 +68,9 @@ func TestValidateJVMReproducibility_GradlePasses(t *testing.T) {
 
 // TestValidateJVMReproducibility_MissingTimestampFails verifies the
 // negative path on a stripped-down POM (no outputTimestamp). The
-// explicit declaration remains a hard gate. Its absence does not establish
-// whether effective Maven defaults/inheritance produce reproducible output.
+// explicit declaration is a hard gate when enforcement is enabled. Its absence
+// does not establish whether effective Maven defaults/inheritance produce
+// reproducible output.
 func TestValidateJVMReproducibility_MissingTimestampFails(t *testing.T) {
 	t.Parallel()
 
@@ -90,7 +91,7 @@ func TestValidateJVMReproducibility_MissingTimestampFails(t *testing.T) {
 	// GITHUB_ACTIONS by default to keep tests host-independent).
 	_, stderr, code := run(t, runOpts{dir: proj, env: map[string]string{
 		"CONFIG_PLAN_JSON": plan,
-	}}, "--format", "github", "validate", "jvm-reproducibility")
+	}}, "--format", "github", "--enforce-reproducible-builds=true", "validate", "jvm-reproducibility")
 	if code != exitValidation {
 		t.Errorf("missing outputTimestamp: exit %d, want 1 (EX_VALIDATION) — the pipeline gates on this code, "+
 			"and a bare non-zero check would also accept a usage error or a crash\nstderr: %s", code, stderr)
@@ -124,7 +125,7 @@ func TestValidateJVMReproducibility_GradleMissingSettingsFails(t *testing.T) {
 
 	_, stderr, code := run(t, runOpts{dir: proj, env: map[string]string{
 		"CONFIG_PLAN_JSON": plan,
-	}}, "--format", "github", "validate", "jvm-reproducibility")
+	}}, "--format", "github", "--enforce-reproducible-builds=true", "validate", "jvm-reproducibility")
 
 	if code != exitValidation {
 		t.Errorf("missing Gradle reproducibility settings: exit %d, want 1 (EX_VALIDATION)\nstderr: %s", code, stderr)

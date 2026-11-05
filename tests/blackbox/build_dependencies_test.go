@@ -21,7 +21,7 @@ func TestNPMBuildScopesCredentialsAcrossRealLifecyclePhases(t *testing.T) {
 	if err := json.Unmarshal([]byte(readFile(t, manifest)), &pkg); err != nil {
 		t.Fatal(err)
 	}
-	pkg["scripts"] = map[string]string{"preinstall": "node check-phase.cjs dependency", "build": "node check-phase.cjs build"}
+	pkg["scripts"] = map[string]string{"preinstall": "node check-phase.cjs dependency", "build": "node check-phase.cjs build", "test": "node check-phase.cjs test"}
 	body, err := json.Marshal(pkg)
 	if err != nil {
 		t.Fatal(err)
@@ -47,11 +47,11 @@ console.log(phase + ' phase checked');
 		"DEPENDENCY_TOKEN": "synthetic-read-only", "ENABLE_BUILD_SBOM": "false",
 		"GH_TOKEN": "synthetic-forge", "CI_TOKEN": "synthetic-ci", "CI_REGISTRY_PASSWORD": "synthetic-registry", "GPG_PRIVATE_KEY": "synthetic-signing",
 	}
-	stdout, stderr, code := run(t, runOpts{dir: project, env: env}, "build", "npm", "run", "--skip-tests", "--private-dependencies", "--dependency-registry", "https://registry.example/")
+	stdout, stderr, code := run(t, runOpts{dir: project, env: env}, "build", "npm", "run", "--private-dependencies", "--dependency-registry", "https://registry.example/")
 	if code != 0 {
 		t.Fatalf("build: %d: %s", code, stderr)
 	}
-	for _, phase := range []string{"dependency", "build"} {
+	for _, phase := range []string{"dependency", "build", "test"} {
 		if !strings.Contains(stdout+stderr, phase+" phase checked") {
 			t.Fatalf("%s lifecycle was not observed: %s%s", phase, stdout, stderr)
 		}

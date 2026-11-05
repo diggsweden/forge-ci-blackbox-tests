@@ -39,7 +39,7 @@ func TestFlow_ArtifactFirst_MavenApp(t *testing.T) {
 
 	// 1. build maven application → target/<name>-<version>.jar
 	if _, stderr, code := run(t, runOpts{dir: proj},
-		"build", "maven", "run", "--build-type", "app", "--cli-opts", "-B -ntp", "--skip-tests", "--build-sbom=false"); code != 0 {
+		"build", "maven", "run", "--build-type", "app", "--cli-opts", "-B -ntp", "--build-sbom=false"); code != 0 {
 		t.Fatalf("step 1 build exit %d\nstderr: %s", code, stderr)
 	}
 
@@ -143,7 +143,7 @@ func TestFlow_ArtifactFirst_MavenLib(t *testing.T) {
 	proj := copyTree(t, fixture("maven-lib"))
 
 	if _, stderr, code := run(t, runOpts{dir: proj},
-		"build", "maven", "run", "--build-type", "lib", "--cli-opts", "-B -ntp", "--skip-tests", "--build-sbom=false"); code != 0 {
+		"build", "maven", "run", "--build-type", "lib", "--cli-opts", "-B -ntp", "--build-sbom=false"); code != 0 {
 		t.Fatalf("library build exit %d\nstderr: %s", code, stderr)
 	}
 
@@ -235,7 +235,7 @@ func TestFlow_ArtifactFirst_Gradle(t *testing.T) {
 	// 1. build gradle application → build/libs/<name>-<version>.jar
 	if _, stderr, code := run(t, runOpts{dir: proj},
 		"build", "gradle", "run",
-		"--tasks", "build", "--skip-tests", "--build-sbom=false"); code != 0 {
+		"--tasks", "build", "--build-sbom=false"); code != 0 {
 		t.Fatalf("step 1 gradle build exit %d\nstderr: %s", code, stderr)
 	}
 

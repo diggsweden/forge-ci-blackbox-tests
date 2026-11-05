@@ -83,6 +83,8 @@ func egressBaseAllowedHosts() []string {
 		"ghcr.io", "pkg-containers.githubusercontent.com",
 		// AGP's sources/javadoc publication links these platform API references.
 		"developer.android.com", "docs.oracle.com", "kotlinlang.org",
+		// Syft's Java archive catalog data.
+		"toolbox-data.anchore.io",
 	}
 }
 
