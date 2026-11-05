@@ -48,6 +48,22 @@ on a pre-existing rustup default. On macOS, install GnuPG separately with
 `sudo port install gnupg2`; run Buildah scenarios on a matching-architecture
 Linux host. Missing-tool evidence remains visible under the optional profile.
 
+The macOS host baseline also comes from MacPorts. Apple `/bin/bash` is 3.2 and
+is not supported by the suite's shell fixtures.
+
+```bash
+sudo port install bash coreutils findutils gsed flock gnupg2
+export PATH="/opt/local/bin:/opt/local/sbin:$HOME/.local/bin:$PATH"
+command -v bash                    # /opt/local/bin/bash
+bash --version                     # GNU bash 5.x
+gsha256sum --version
+grealpath --version
+```
+
+Do not put `/opt/local/libexec/gnubin` first globally. Use it only for a scoped
+command that explicitly models Linux GNU semantics, as shown for the strict
+contract check below; native macOS rows should retain native command behavior.
+
 Buildah needs a working OCI runtime such as `crun` or `runc`, and the host's
 normal rootless-user namespace configuration. An absent Buildah skips the
 container scenarios in the developer profile, but a present Buildah that fails
@@ -130,6 +146,16 @@ support) fails instead. `TestMain`:
 
 Explicit Linux exclusions remain exclusions; strict mode does not turn them
 into claimed coverage.
+
+| Host | `just test` | `just test-strict` | Native container evidence |
+|---|---|---|---|
+| Linux AMD64 | Supported; missing optional tools are **NOT PROVEN** | Supported with all prerequisites | `linux/amd64` |
+| Linux ARM64 | Supported; missing optional tools and declared exclusions are **NOT PROVEN** | Supported with all prerequisites | `linux/arm64`; Android/AAPT2 exclusion remains explicit |
+| macOS ARM64 (M1 or later) | Supported as a permissive developer run | Refused by design | No Linux Buildah evidence; dependent rows skip |
+
+Cross-compiled engine binaries may be selected with `FORGE_CI_TEST_BINARY`, but
+the suite executes that binary. Its OS and architecture must therefore match
+the host; cross-compilation alone is not compatibility evidence.
 
 `TestAndroidLibraryBuildAndExportInPinnedRuntime` is permanently restricted by
 the `blackbox && linux && amd64` build constraint. Google's Maven-provided

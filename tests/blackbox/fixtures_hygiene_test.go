@@ -170,13 +170,13 @@ func TestFixtures_ToolchainsArePinned(t *testing.T) {
 	t.Parallel()
 
 	pinned := map[string]string{
-		"cargo-hello/rust-toolchain.toml":                       `channel = "1.94.0"`,
-		"cargo-workspace/rust-toolchain.toml":                   `channel = "1.94.0"`,
-		"cargo-hello/Containerfile":                             "rust:1.94.0-slim-bookworm",
-		"go-hello/Containerfile":                                "golang:1.27.2-bookworm",
-		"gradle-hello/gradle/wrapper/gradle-wrapper.properties": "gradle-9.5.1-bin.zip",
-		"gradle-hello/gradle/wrapper/gradle-wrapper.jar.sha256": "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7",
-		"android-library/Containerfile":                           "ghcr.io/cirruslabs/android-sdk:35@sha256:c724009e305b4607157287624033ab97f319af44c244bfc9f73b6293f3bb01b9",
+		"cargo-hello/rust-toolchain.toml":                          `channel = "1.94.0"`,
+		"cargo-workspace/rust-toolchain.toml":                      `channel = "1.94.0"`,
+		"cargo-hello/Containerfile":                                "rust:1.94.0-slim-bookworm",
+		"go-hello/Containerfile":                                   "golang:1.27.2-bookworm",
+		"gradle-hello/gradle/wrapper/gradle-wrapper.properties":    "gradle-9.5.1-bin.zip",
+		"gradle-hello/gradle/wrapper/gradle-wrapper.jar.sha256":    "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7",
+		"android-library/Containerfile":                            "ghcr.io/cirruslabs/android-sdk:35@sha256:c724009e305b4607157287624033ab97f319af44c244bfc9f73b6293f3bb01b9",
 		"android-library/gradle/wrapper/gradle-wrapper.properties": "gradle-8.11.1-bin.zip",
 	}
 
