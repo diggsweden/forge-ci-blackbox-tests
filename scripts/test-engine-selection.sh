@@ -8,6 +8,7 @@ set -euo pipefail
 harness=${1:?pass the absolute path of the compiled blackbox test harness}
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
+work=$(cd -- "$work" && pwd -P)
 mkdir -p "$work/tools" "$work/cache" "$work/renamed source/cmd/forge-ci" "$work/invalid/cmd"
 touch "$work/invalid/cmd/forge-ci"
 cat >"$work/prebuilt engine" <<'SH'
