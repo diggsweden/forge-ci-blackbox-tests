@@ -7,8 +7,10 @@
 
 This independent black-box suite tests the Forge CI executable. Set
 `FORGE_CI_TEST_BINARY` to the binary under test; no engine source checkout is
-required. As a development convenience, when the variable is unset the suite
-builds the adjacent `../forge-ci` checkout.
+required. For a source build, unset that variable and set `FORGE_CI_TEST_SOURCE`
+to the absolute path of your chosen engine checkout. The suite builds it once.
+An explicit binary takes precedence over a source checkout. With neither input,
+the suite refuses the run instead of discovering another checkout.
 
 Custom launchers must use `FORGE_CI_TEST_BINARY` instead of the former
 `FORGE_CI` override, and review their immutable suite pin together with the
@@ -18,8 +20,8 @@ CI evidence.
 ## Requirements
 
 - Go 1.27.2 or newer, to run `go test`.
-- `FORGE_CI_TEST_BINARY` pointing at a pre-built engine binary, or a checkout
-  of the chosen engine in the adjacent `forge-ci` directory.
+- `FORGE_CI_TEST_BINARY` pointing at a pre-built engine binary, or
+  `FORGE_CI_TEST_SOURCE` pointing at an absolute engine checkout path.
 - Optional for the default developer profile: `mvn`, `npm`, `cargo`,
   `buildah`, `gpg`/`gpgconf`, `syft`, `cyclonedx-gomod`, `cargo-cyclonedx`, and
   the JDK (`java` and `javac`), Git, Cosign, Bash, `sha256sum`, `ssh-keygen`
@@ -76,9 +78,8 @@ checks the repository/ref override contract without requiring the original
 organization's fallback values. A missing active workflow is an error, even
 if an inactive GitHub copy remains.
 
-Locally, set `FORGE_CI_TEST_BINARY` to the chosen executable. To use the optional
-automatic build instead, clone the engine into the adjacent directory named
-`forge-ci`, regardless of its remote repository name.
+Locally, select the executable with `FORGE_CI_TEST_BINARY` or the source checkout
+with `FORGE_CI_TEST_SOURCE`. The source checkout may have any directory name.
 
 Synthetic fixture coordinates use `fixture/integration`, `@fixture/npm-app`,
 `@fixture/npm-lib`, and the JVM groups `org.example.test` or
@@ -92,6 +93,9 @@ they identify the real project rather than synthetic test data.
 ## Commands
 
 ```bash
+# Select the source checkout explicitly, or use FORGE_CI_TEST_BINARY instead.
+export FORGE_CI_TEST_SOURCE=/absolute/path/to/engine-checkout
+
 # Run the whole suite. In the default profile, toolchain-dependent tests skip
 # when their tools are unavailable. -v shows PASS/SKIP/FAIL lines as they happen.
 go test -tags=blackbox -count=1 -v ./tests/blackbox/...
@@ -196,6 +200,11 @@ path.
 forwarding, profile preservation and failure propagation using an inert Go
 stand-in, without building or running the engine.
 
+`bash scripts/validate-strict-profile-contract.sh` also exercises engine selection
+through the compiled harness with inert compiler and executable stand-ins. It
+checks missing/invalid source inputs, renamed checkouts with spaces, binary
+precedence and build failures without building the real engine.
+
 ## Common gotchas
 
 For a focused retry, use `just test-run TestName` in the local profile; strict
@@ -203,10 +212,9 @@ mode intentionally refuses filters. After Ctrl-C or a killed run, confirm no
 suite is using the caches, follow the printed lock-removal command, then run
 `just clean`. See [Stopping a run](isolation.md#stopping-a-run) for details.
 
-- **"package diggsweden/forge-ci/cmd/forge-ci not found"**: the sibling
-  `forge-ci/` directory is missing. Clone it next to this repository, or set
-  `FORGE_CI_TEST_BINARY=/path/to/forge-ci-binary` to point at a pre-built
-  binary.
+- **Missing engine selection or invalid source path**: set
+  `FORGE_CI_TEST_SOURCE` to an absolute checkout path containing `cmd/forge-ci`,
+  or set `FORGE_CI_TEST_BINARY=/absolute/path/to/forge-ci-binary`.
 - **Lots of `--- SKIP` in the default developer profile**: expected unless you
   have the full toolchain installed. Each test names the missing tool or
   evidence. Strict mode fails rather than skipping any of these paths.

@@ -6,8 +6,8 @@
 #
 # This repo is one build-tagged (`blackbox`) Go test package that drives
 # the compiled forge-ci binary as a black box. There is nothing to build
-# here — the suite builds the binary itself, from the sibling ../forge-ci
-# checkout (override with FORGE_CI_TEST_BINARY=/path/to/binary).
+# here — select an engine checkout with FORGE_CI_TEST_SOURCE=/absolute/engine,
+# or a prebuilt executable with FORGE_CI_TEST_BINARY=/absolute/forge-ci.
 #
 # Lint is golangci-lint against .golangci.yml, which carries the engine
 # repo's linter set plus the exclusions that a subprocess-driving test
@@ -17,6 +17,7 @@
 # Quick start:
 #   mise trust               # allow this checkout's pinned toolchain
 #   just install-dev-tools   # pinned tools
+#   export FORGE_CI_TEST_SOURCE=/absolute/engine # or FORGE_CI_TEST_BINARY
 #   just verify-fix          # apply safe fixes, then lint and test
 #   just verify              # lint + permissive local suite (CI uses strict)
 #   just test-run FILTER
@@ -41,7 +42,7 @@ pkg := "./tests/blackbox/"
 
 [private]
 default:
-    @printf '{{ CYAN_BOLD }} Forge CI black-box testsuite recipes{{ NC }}\n\n Quick start: {{ BLUE }}mise trust{{ NC }} · {{ MAGENTA }}just install-dev-tools{{ NC }} · {{ GREEN }}just test{{ NC }}\n Needs the engine: a ../forge-ci checkout, or FORGE_CI_TEST_BINARY=/path/to/forge-ci\n First run: downloads toolchains and base images, and may start containers\n NOT PROVEN = a test skipped for a missing tool; just test-strict fails it instead\n ▪ main job of its group\n\n'
+    @printf '{{ CYAN_BOLD }} Forge CI black-box testsuite recipes{{ NC }}\n\n Quick start: {{ BLUE }}mise trust{{ NC }} · {{ MAGENTA }}just install-dev-tools{{ NC }} · {{ GREEN }}just test{{ NC }}\n Needs the engine: FORGE_CI_TEST_SOURCE=/absolute/engine, or FORGE_CI_TEST_BINARY=/absolute/forge-ci\n First run: downloads toolchains and base images, and may start containers\n NOT PROVEN = a test skipped for a missing tool; just test-strict fails it instead\n ▪ main job of its group\n\n'
     @"{{ just_executable() }}" --justfile "{{ justfile() }}" --list --unsorted --list-heading ''
 
 # ==================================================================================== #
@@ -86,7 +87,7 @@ verify-fix: lint-fix verify
 #                a skip for a missing tool or fixture fails instead, the
 #                egress audit must run, and test selection is refused
 #   test-binary  the same rows against a binary someone else built, rather
-#                than the one the suite builds from ../forge-ci
+#                than the one the suite builds from FORGE_CI_TEST_SOURCE
 #   test-run     one row, or a family of them, by name
 #
 # No workflow calls just: this repo's compatibility job runs `go test -json`
@@ -122,8 +123,8 @@ test *args:
 test-strict *args:
     @FORGE_CI_BLACKBOX_PROFILE=strict go test -tags=blackbox -count=1 -timeout 35m -v "$@" {{ pkg }}...
 
-# For a binary someone else produced: a release artefact, or an engine
-# checkout that is not the sibling ../forge-ci the suite builds from.
+# For a binary someone else produced, such as a release artefact or a build
+# from any engine checkout. Takes precedence over FORGE_CI_TEST_SOURCE.
 # The literal path is relative to the recipe working directory (normally this
 # checkout), not PATH. Make it absolute before Go changes to the test package
 # and engine subprocesses change to fixture directories. Keep inherited profile.

@@ -32,9 +32,10 @@ mise exec -- just install-dev-tools
 export FORGE_CI_TEST_BINARY=/absolute/path/to/forge-ci
 ```
 
-For source development, you can instead clone the chosen engine into the
-adjacent `../forge-ci` directory and leave `FORGE_CI_TEST_BINARY` unset. The
-suite builds that checkout automatically.
+For source development, unset `FORGE_CI_TEST_BINARY` and set
+`FORGE_CI_TEST_SOURCE=/absolute/path/to/engine-checkout`. The suite builds that
+checkout once. Neither checkout's name nor location relative to the other matters.
+An explicit binary takes precedence when both variables are set.
 
 Then run the suite:
 

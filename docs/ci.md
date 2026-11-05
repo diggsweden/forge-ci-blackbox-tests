@@ -33,7 +33,7 @@ Review the engine and test-suite revisions together when a command contract
 changes. The current suite uses `--release-policy` and exercises in-process SSH
 host-key inspection. To test a PR candidate explicitly, build that exact checkout
 and set `FORGE_CI_TEST_BINARY` to the absolute path of the resulting executable.
-That override takes precedence over building the suite's sibling checkout; it
+That override takes precedence over building `FORGE_CI_TEST_SOURCE`; it
 must identify the candidate under review, not an older release binary.
 
 The repository override is one `owner/name` boundary with canonical default
@@ -93,11 +93,11 @@ From this checkout:
 ```bash
 FORGE_CI_BLACKBOX_PROFILE=strict \
 FORGE_CI_PROC_SWAPS=/dev/null \
+FORGE_CI_TEST_SOURCE=/absolute/path/to/engine-checkout \
 go test -tags=blackbox -count=1 -timeout 35m ./tests/blackbox/...
 ```
 
-Keep the `forge-ci` checkout as a sibling directory, or set
-`FORGE_CI_TEST_BINARY` to an explicit binary. For an intentionally partial
-developer diagnostic, omit the strict profile; that result is useful locally
-but is not equivalent to strict compatibility evidence or the parent's
-immutable release gate.
+Alternatively, set `FORGE_CI_TEST_BINARY` to an explicit binary. For an
+intentionally partial developer diagnostic, omit the strict profile; that result
+is useful locally but is not equivalent to strict compatibility evidence or the
+parent's immutable release gate.

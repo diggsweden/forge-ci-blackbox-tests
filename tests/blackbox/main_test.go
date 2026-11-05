@@ -18,8 +18,7 @@
 //   - The build tag lets `go test ./...` ignore these during development
 //     and opt in for the full suite.
 //
-// The tag is `blackbox`: that is what this suite is, and what the rest of
-// the estate calls a tier that drives the built binary. The engine
+// The tag is `blackbox`: this tier drives the built binary. The engine
 // repository invokes this suite by that tag, so the name is an interface
 // between two repositories rather than a local detail — changing it again
 // means changing both, in that order.
@@ -32,8 +31,8 @@
 //
 // Running:
 //
-//	go test -tags=blackbox -count=1 ./tests/blackbox/...
-//	go test -tags=blackbox -count=1 -run TestGoBuild_Reproducible ./tests/blackbox/
+//	FORGE_CI_TEST_SOURCE=/absolute/engine go test -tags=blackbox -count=1 ./tests/blackbox/...
+//	FORGE_CI_TEST_BINARY=/absolute/forge-ci go test -tags=blackbox -count=1 -run TestGoBuild_Reproducible ./tests/blackbox/
 package blackbox
 
 import (
@@ -68,7 +67,7 @@ var errStrictProfile = errors.New("invalid strict blackbox profile") //nolint:go
 var suiteCtx, stopSignals = signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP) //nolint:gochecknoglobals // intentional: the suite's one root context.
 
 // A compatible old engine must not accidentally validate the renamed checkout.
-// Exercise the public executable identity for both the sibling build and an
+// Exercise the public executable identity for both an explicit source build and an
 // explicit FORGE_CI_TEST_BINARY override, rather than trusting the executable's filename.
 func TestBinaryIdentity_HelpNamesForgeCI(t *testing.T) {
 	t.Parallel()
@@ -85,8 +84,8 @@ func TestBinaryIdentity_HelpNamesForgeCI(t *testing.T) {
 	}
 }
 
-// TestMain builds the binary once for the whole package unless FORGE_CI_TEST_BINARY names
-// an explicit binary under test. The real work is in runSuite so its deferred
+// TestMain uses FORGE_CI_TEST_BINARY or builds FORGE_CI_TEST_SOURCE once for the
+// whole package. The real work is in runSuite so its deferred
 // temp-dir cleanup runs before os.Exit (which would skip it).
 func TestMain(m *testing.M) {
 	code := runSuite(m)
@@ -162,7 +161,7 @@ func runSuite(m *testing.M) (code int) {
 		return 2
 	}
 
-	// An explicit FORGE_CI_TEST_BINARY override ALWAYS wins over the adjacent
+	// An explicit FORGE_CI_TEST_BINARY override ALWAYS wins over the selected
 	// checkout: compatibility gates point it at the exact candidate binary,
 	// and testing a fresh self-build instead would
 	// silently validate the wrong artifact.
@@ -172,9 +171,16 @@ func runSuite(m *testing.M) (code int) {
 		return m.Run()
 	}
 
-	repo := filepath.Clean(filepath.Join(suiteDir, "..", "forge-ci"))
-	if _, err := os.Stat(filepath.Join(repo, "cmd", "forge-ci")); err != nil {
-		panic("blackbox: cannot find sibling ../forge-ci/cmd/forge-ci - set FORGE_CI_TEST_BINARY to override")
+	repo := os.Getenv("FORGE_CI_TEST_SOURCE")
+	if !filepath.IsAbs(repo) {
+		fmt.Fprintln(os.Stderr, "blackbox: set FORGE_CI_TEST_BINARY to an engine executable or FORGE_CI_TEST_SOURCE to an absolute engine checkout path")
+
+		return 2
+	}
+	if info, err := os.Stat(filepath.Join(repo, "cmd", "forge-ci")); err != nil || !info.IsDir() {
+		fmt.Fprintf(os.Stderr, "blackbox: FORGE_CI_TEST_SOURCE %q must contain the cmd/forge-ci directory\n", repo)
+
+		return 2
 	}
 
 	tmp, err := os.MkdirTemp("", "forge-ci-int-*")

@@ -53,6 +53,8 @@ printf 'blackbox contract: suite drift target supports repository/ref overrides\
 	go test -c -tags=blackbox -o "$tmp/blackbox-contract.test" ./tests/blackbox/
 )
 
+bash "$root/scripts/test-engine-selection.sh" "$tmp/blackbox-contract.test"
+
 # Both probes stop in TestMain's preflight, before the suite builds
 # forge-ci or runs a row, so they need no toolchain beyond Go.
 if FORGE_CI_BLACKBOX_PROFILE=strict \

@@ -5,7 +5,7 @@
 #
 # Drives the testsuite's `go test -tags=blackbox -count=1 ./tests/blackbox/...`
 # against a chosen `diggsweden/forge-ci` ref. The testsuite's TestMain
-# builds the forge-ci binary from the sibling checkout (or honours the
+# builds the forge-ci binary from FORGE_CI_TEST_SOURCE (or honours the
 # FORGE_CI_TEST_BINARY env var when set), then runs every Test* in the package.
 #
 # Trigger surface:
@@ -289,6 +289,7 @@ jobs:
         env:
           EVIDENCE_DIR: ${{ runner.temp }}/forge-ci-compatibility-evidence
           FORGE_CI_BLACKBOX_PROFILE: strict
+          FORGE_CI_TEST_SOURCE: ${{ github.workspace }}/forge-ci
           FORGE_CI_PROC_SWAPS: "/dev/null"
           TMPDIR: ${{ runner.temp }}
         run: |
