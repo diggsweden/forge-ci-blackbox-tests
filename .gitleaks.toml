@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Digg - Agency for Digital Government
+# SPDX-License-Identifier: CC0-1.0
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deliberately malformed armor exercises GPG error redaction; it contains no key."
+targetRules = ["private-key"]
+condition = "AND"
+paths = ['''^tests/blackbox/release_gpg_import_test\.go$''']
+regexTarget = "match"
+regexes = ['''this-is-not-base64-armor-payload''']
+
+[[allowlists]]
+description = "Synthetic Docker auth fixture decodes to user:auth-secret at registry.example."
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^tests/blackbox/container_login_test\.go$''']
+regexTarget = "secret"
+regexes = ['''^dXNlcjphdXRoLXNlY3JldA==$''']

@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = ["crates/common", "crates/cli", "crates/server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "CC0-1.0"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }

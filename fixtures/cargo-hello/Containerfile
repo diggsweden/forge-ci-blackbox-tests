@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 Digg - Agency for Digital Government
+# SPDX-License-Identifier: CC0-1.0
+#
+# Container-first fixture for the cargo-hello hello-world crate.
+# Mirrors the structure of examples/cargo-app/Containerfile.example
+# but trimmed to scratch base with no apt deps so the test stays
+# fast (~1-2s on cache hit, ~10s cold).
+#
+# Three stages — matches what publish-container.yml expects when
+# extract.binary.target is set:
+#
+#   - builder       : compiles the binary
+#   - export-binary : scratch image with the binary at root,
+#                     consumed by extract.binary
+#   - runtime       : the deployable image
+#
+# Cargo doesn't need SOURCE_DATE_EPOCH for binary reproducibility
+# (stock cargo on a fixed toolchain + lockfile is deterministic);
+# we omit any ARG SOURCE_DATE_EPOCH to exercise the "preferred"
+# pattern documented in docs/ecosystems.md.
+
+# Compatibility fixture: tags intentionally track ecosystem patch updates.
+# CI records the resolved Buildah image data; these are not immutable release inputs.
+
+FROM --platform=$BUILDPLATFORM docker.io/library/rust:1.94.0-slim-bookworm AS builder
+WORKDIR /src
+
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+
+RUN cargo build --release --locked
+
+FROM scratch AS export-binary
+COPY --from=builder /src/target/release/cargo-hello /cargo-hello
+
+FROM docker.io/library/debian:bookworm-slim AS runtime
+COPY --from=builder /src/target/release/cargo-hello /usr/local/bin/cargo-hello
+ENTRYPOINT ["/usr/local/bin/cargo-hello"]

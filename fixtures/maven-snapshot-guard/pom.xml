@@ -1,0 +1,21 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.example.fixture</groupId>
+  <artifactId>snapshot-guard</artifactId>
+  <version>1.2.3</version>
+  <packaging>pom</packaging>
+  <properties>
+    <fixture.registry>https://unconfigured.invalid</fixture.registry>
+  </properties>
+  <profiles>
+    <profile>
+      <id>publish</id>
+      <distributionManagement>
+        <repository>
+          <id>fixture</id>
+          <url>${fixture.registry}</url>
+        </repository>
+      </distributionManagement>
+    </profile>
+  </profiles>
+</project>

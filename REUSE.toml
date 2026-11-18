@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: 2026 Digg - Agency for Digital Government
+#
+# SPDX-License-Identifier: CC0-1.0
+
+version = 1
+
+# No default: a new file without a header fails `reuse lint` until it is
+# annotated here or given a header. Code files carry their own headers.
+
+# Documentation, CC0-1.0: override because Markdown quotes SPDX snippets.
+[[annotations]]
+path = "**/*.md"
+precedence = "override"
+SPDX-FileCopyrightText = "2026 Digg - Agency for Digital Government"
+SPDX-License-Identifier = "CC0-1.0"
+
+# Go module manifest and lockfile and the mise lockfile, CC0-1.0: closest,
+# as the toolchains write them without comments.
+[[annotations]]
+path = ["go.mod", "go.sum", "mise.lock"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Digg - Agency for Digital Government"
+SPDX-License-Identifier = "CC0-1.0"
+
+# Ecosystem fixtures, CC0-1.0, so an adopter can lift one as a starting
+# point: closest, as most are manifests or lockfiles without comment syntax
+# and the fixture sources carry their own headers. The gradle-hello wrapper
+# is third-party and annotated below.
+[[annotations]]
+path = [
+  "fixtures/android-library/**",
+  "fixtures/cargo-hello/**",
+  "fixtures/cargo-workspace/**",
+  "fixtures/go-hello/**",
+  "fixtures/gradle-android-hello/**",
+  "fixtures/gradle-hello/build.gradle",
+  "fixtures/gradle-hello/gradle.properties",
+  "fixtures/gradle-hello/gradle/wrapper/gradle-wrapper.jar.sha256",
+  "fixtures/gradle-hello/settings.gradle",
+  "fixtures/gradle-hello/src/**",
+  "fixtures/gradle-library/**",
+  "fixtures/gradle-multi-library/**",
+  "fixtures/maven-central-snapshot/**",
+  "fixtures/maven-environment-profile/**",
+  "fixtures/maven-hello/**",
+  "fixtures/maven-lib/**",
+  "fixtures/maven-multi/**",
+  "fixtures/maven-profile-metadata/**",
+  "fixtures/maven-snapshot-guard/**",
+  "fixtures/npm-app/**",
+  "fixtures/npm-lib/**",
+]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Digg - Agency for Digital Government"
+SPDX-License-Identifier = "CC0-1.0"
+
+# Vendored Gradle wrapper, Apache-2.0: override, as third-party material
+# keeps its own terms. gradlew and gradlew.bat carry their own Apache-2.0
+# headers; the jar is binary and the properties file is generated.
+[[annotations]]
+path = [
+  "fixtures/gradle-hello/gradle/wrapper/gradle-wrapper.jar",
+  "fixtures/gradle-hello/gradle/wrapper/gradle-wrapper.properties",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "Gradle Inc."
+SPDX-License-Identifier = "Apache-2.0"

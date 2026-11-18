@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 Digg - Agency for Digital Government
+#
+# SPDX-License-Identifier: CC0-1.0
+
+root = true
+
+# shfmt reads this section: `shfmt -d scripts` checks, `shfmt -w scripts` applies.
+# The vendored fixtures/gradle-hello/gradlew keeps its upstream format.
+[*.sh]
+indent_style = space
+indent_size = 2

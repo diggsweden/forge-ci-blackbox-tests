@@ -1,0 +1,6 @@
+# Pinning the compiler keeps CI and local builds consistent and supports
+# reproducibility checks; it does not by itself guarantee identical binaries.
+# `forge-ci validate cargo` requires this file (or a plain-text
+# `rust-toolchain` sibling) on every Cargo artifact.
+[toolchain]
+channel = "1.94.0"
