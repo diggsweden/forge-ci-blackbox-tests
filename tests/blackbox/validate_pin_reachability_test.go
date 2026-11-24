@@ -56,13 +56,13 @@ func TestPinReachability_ReachablePasses(t *testing.T) {
 	wf := pinnedWorkflow(t, reachable)
 
 	_, stderr, code := run(t, runOpts{},
-		"validate", "pin-reachability", "--repo-dir", repo, "--subject", "engine", "--main", "main", "--workflow", wf)
+		"validate", "pin-reachability", "--repo-dir", repo, "--subject", "fixture/engine", "--main", "main", "--workflow", wf)
 
 	if code != 0 {
 		t.Fatalf("expected exit 0 for reachable pin, got %d\nstderr: %s", code, stderr)
 	}
 
-	assertContains(t, "reachable pin", stderr, "All engine pins are reachable")
+	assertContains(t, "reachable pin", stderr, "All fixture/engine pins are reachable")
 }
 
 // TestPinReachability_OrphanedFails: a pin to a commit no longer reachable
@@ -74,7 +74,7 @@ func TestPinReachability_OrphanedFails(t *testing.T) {
 	wf := pinnedWorkflow(t, orphan)
 
 	_, stderr, code := run(t, runOpts{},
-		"validate", "pin-reachability", "--repo-dir", repo, "--subject", "engine", "--main", "main", "--workflow", wf)
+		"validate", "pin-reachability", "--repo-dir", repo, "--subject", "fixture/engine", "--main", "main", "--workflow", wf)
 
 	if code != exitValidation { // EX_VALIDATION: orphaned pin
 		t.Fatalf("expected EX_VALIDATION=1 for orphaned pin, got %d\nstderr: %s", code, stderr)
