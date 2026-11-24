@@ -141,6 +141,38 @@ func TestDeriveRelease_PrereleaseRequiresExplicitPolicy(t *testing.T) {
 	}
 }
 
+// A fork's vX.Y.Z-WORD.N build is a release only under its own fork:WORD
+// policy: stable and another fork's word refuse it.
+func TestDeriveRelease_ForkPolicyAdmitsOnlyItsOwnBuilds(t *testing.T) {
+	t.Parallel()
+	requireTool(t, "git")
+	requireTool(t, "gpg")
+	key := bootstrapGPGKey(t)
+	repo := initGitRepo(t, map[string]string{"GNUPGHOME": key.gnupgHome}, func(repo string, runGit func(args ...string) error) {
+		makeGPGSignedTag(t, runGit, repo, key, "release-request/v2.0.0-acme.1")
+	})
+	for _, policy := range []string{"fork:acme", "stable", "fork:other"} {
+		output := filepath.Join(t.TempDir(), "outputs")
+		_, stderr, code := run(t, runOpts{dir: repo, env: map[string]string{
+			"FORGE_CI_RUNNER": "forgejo", "FORGEJO_OUTPUT": output, "GNUPGHOME": key.gnupgHome,
+		}}, "version", "derive-release", "--ref-name", "release-request/v2.0.0-acme.1",
+			"--require-release-request", "--release-policy", policy)
+		if policy != "fork:acme" {
+			if code != exitValidation {
+				t.Fatalf("%s exit=%d, want validation refusal: %s", policy, code, stderr)
+			}
+
+			continue
+		}
+		if code != 0 {
+			t.Fatalf("fork:acme exit=%d: %s", code, stderr)
+		}
+		if got := parseGHAOutputs(t, output)["release-tag"]; got != "v2.0.0-acme.1" {
+			t.Fatalf("release-tag=%q, want the exact fork build", got)
+		}
+	}
+}
+
 // --- G2: render-changelog backend contract + secret hygiene --------------
 
 // renderFixture builds a real repo (main branch, tracked CHANGELOG.md, bare

@@ -132,7 +132,7 @@ func TestPreparedInputs_WarmOfflineReuseAndTamperRefusal(t *testing.T) {
 	auth := fixture.authFile(t, "fixture")
 	build := preparedBuildJSON(t, fixture, parent, true)
 	root := t.TempDir()
-	if _, stderr, code := run(t, runOpts{dir: root}, append(preparedInputArgs(build, "fetch-build-inputs"), "--auth-file", auth)...); code != 0 {
+	if _, stderr, code := run(t, runOpts{dir: root}, append(preparedInputArgs(build, "fetch-inputs"), "--auth-file", auth)...); code != 0 {
 		t.Fatalf("fetch: exit=%d %s", code, stderr)
 	}
 	writes := fixture.writes.Load()
@@ -256,7 +256,7 @@ func TestPreparedInputs_ColdOfflineNativeBuild(t *testing.T) {
 	build := preparedBuildJSON(t, fixture, parent, false)
 	dir := t.TempDir()
 	auth := fixture.authFile(t, "fixture")
-	if _, stderr, code := run(t, runOpts{dir: dir}, append(preparedInputArgs(build, "fetch-build-inputs"), "--auth-file", auth)...); code != 0 {
+	if _, stderr, code := run(t, runOpts{dir: dir}, append(preparedInputArgs(build, "fetch-inputs"), "--auth-file", auth)...); code != 0 {
 		t.Fatalf("cold input fetch: exit=%d %s", code, stderr)
 	}
 	fixture.server.Close()

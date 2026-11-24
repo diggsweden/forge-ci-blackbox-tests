@@ -30,7 +30,7 @@ func commandGroupCoverage() map[string]commandGroupDisposition {
 		"container": {covered: true, reason: "container_* and flow_container_first_test.go"},
 		"docs":      {covered: true, reason: "docs_test.go"},
 		"doctor":    {covered: true, reason: "doctor_test.go"},
-		"init":      {covered: false, reason: "reads the examples from a forge-ci mirror over git; forge-ci's consumerinit tests cover it"},
+		"init":      {covered: false, reason: "reads a local forge-ci checkout; forge-ci's smoke_init_test.go drives the binary over one"},
 		"lint":      {covered: false, reason: "Swift lint wrappers require a macOS toolchain"},
 		"plan":      {covered: true, reason: "plan_* and version_snapshot_test.go"},
 		"platform":  {covered: true, reason: "platform_checkout_test.go"},
